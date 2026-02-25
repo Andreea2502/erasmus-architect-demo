@@ -812,26 +812,35 @@ async function generateSingleAnswerForSection(
       `Erasmus+ ${question.text} ${chapter.title} Antragsstellung`
     );
 
-    // Character limit - STRICT: target 93-98% of limit
+    // Character limit - user requested +/- 10-15% tolerance.
+    // VARIANTE 1: Buffer for German text so English translation doesn't exceed EU limits
+    const isGerman = language === 'de';
     const charLimit = question.charLimit || 3000;
-    const targetLength = Math.round(charLimit * 0.95);
-    const minLength = Math.round(charLimit * 0.90);
-    const maxLength = Math.round(charLimit * 0.99);
+
+    // If German, target ~75-85% of the max limit. If English, target 90-99%.
+    const targetLength = isGerman ? Math.round(charLimit * 0.80) : Math.round(charLimit * 0.90);
+    const minLength = isGerman ? Math.round(charLimit * 0.70) : Math.round(charLimit * 0.80);
+    const maxLength = isGerman ? Math.round(charLimit * 0.85) : Math.round(charLimit * 0.99);
+
+    // LLMs are notoriously bad at counting characters. Provide WORD counts instead (~7 chars/word)
+    const targetWords = Math.round(targetLength / 7);
+    const minWords = Math.round(minLength / 7);
+    const maxWords = Math.round(maxLength / 7);
 
     const langName = language === 'de' ? 'Deutsch' : 'English';
 
     const prompt = `Du bist ein erfahrener Erasmus+ Antragsberater.
 
 ═══════════════════════════════════════════════════════════════
-REGEL 1: ZEICHENLIMIT (WICHTIGSTE REGEL!)
+REGEL 1: ZEICHEN- UND WORTLIMIT (WICHTIGSTE REGEL!)
 ═══════════════════════════════════════════════════════════════
-LIMIT: ${charLimit} Zeichen
-DEIN ZIEL: Schreibe EXAKT ${targetLength} Zeichen (±5%)
-MINIMUM: ${minLength} Zeichen - NICHT WENIGER!
-MAXIMUM: ${maxLength} Zeichen - NICHT MEHR!
+MAXIMALES ZEICHENLIMIT: ${charLimit} Zeichen
+ZIEL: Schreibe ca. ${targetWords} Wörter (das entspricht etwa ${targetLength} Zeichen, +/- 10-15%).
+MINIMUM: ${minWords} Wörter (${minLength} Zeichen) - NICHT WENIGER!
+MAXIMUM: ${maxWords} Wörter (${maxLength} Zeichen) - NICHT MEHR!
 
->>> Wenn dein Text unter ${minLength} Zeichen ist: SOFORT mehr Details, Beispiele, Begründungen hinzufügen! <<<
->>> Zähle die Zeichen vor dem Antworten! <<<
+>>> WICHTIG: KI-Modelle verschätzen sich oft bei Zeichen. Halte dich streng an das WORT-Limit (${minWords}-${maxWords} Wörter)! <<<
+>>> Wenn dein Text unter ${minWords} Wörtern ist: SOFORT mehr Details, Beispiele, Begründungen hinzufügen! <<<
 
 ═══════════════════════════════════════════════════════════════
 REGEL 2: FORMATIERUNG (GUT LESBAR!)
@@ -883,7 +892,7 @@ ${question.helpText ? `Hinweis: ${question.helpText}` : ''}
 Schreibe auf ${langName}. Antworte NUR mit dem Text (keine Einleitung wie "Hier ist...").
 
 CHECKLISTE VOR DEM ANTWORTEN:
-☐ Text hat MINDESTENS ${minLength} Zeichen? Falls NEIN → SOFORT mehr schreiben! Füge Details, Beispiele und Begründungen hinzu!
+☐ Text hat MINDESTENS ${minWords} Wörter (${minLength} Zeichen)? Falls NEIN → SOFORT mehr schreiben! Füge Details, Beispiele und Begründungen hinzu!
 ☐ Text hat 3-5 ausführliche Absätze mit einer obligatorischen Leerzeile dazwischen?
 ☐ Wurden NIEMALS ganze Sätze oder Absätze komplett in **fett** geschrieben?
 ☐ Listen haben Spiegelstriche (- ) mit jeweils 2-3 Sätzen Erklärung?
@@ -893,7 +902,7 @@ CHECKLISTE VOR DEM ANTWORTEN:
     const systemContext = `Du bist EU-Projektexperte für Erasmus+ Anträge.
 
 KRITISCHE REGELN:
-1. ZEICHENLIMIT: Deine Antwort MUSS mindestens ${minLength} Zeichen lang sein! Ziel: ${targetLength} Zeichen. Wenn dein Entwurf zu kurz ist, füge SOFORT mehr Details, Begründungen, konkrete Beispiele, Zahlen und Methoden hinzu bis du mindestens ${minLength} Zeichen erreichst. NIEMALS unter ${minLength} Zeichen abgeben!
+1. ZEICHEN- UND WORTLIMIT: Deine Antwort MUSS mindestens ${minWords} Wörter (${minLength} Zeichen) lang sein! Ziel: ${targetWords} Wörter (+/- 10-15%). Wenn dein Entwurf zu kurz ist, füge SOFORT mehr Details, Begründungen, konkrete Beispiele, Zahlen und Methoden hinzu bis du mindestens ${minWords} Wörter erreichst. NIEMALS drunter abgeben!
 2. ABSÄTZE: Füge zwingend Leerzeilen zwischen thematischen Blöcken ein.
 3. LISTEN: Nutze zwingend Spiegelstriche (- ) für Aufzählungen. Keine Nummern unless explicitly requested.
 4. FORMATIERUNG: Nutze **fett** AUSSCHLIESSLICH für kurze Überschriften und einzelne Schlüsselbegriffe. NIEMALS für ganze Sätze oder Absätze!
@@ -1035,15 +1044,17 @@ Beantworte die folgenden Fragen des Erasmus+ Antragsformulars. Jede Antwort muss
 5. NIEMALS generische Floskeln verwenden
 6. ALS FLIESSTEXT geschrieben werden - KEINE Bulletpoint-Listen als Hauptstruktur!
 
-=== ZEICHENLIMITS (ABSOLUT KRITISCH!) ===
-⚠️ JEDE ANTWORT MUSS DAS ZEICHENLIMIT OPTIMAL AUSNUTZEN! ⚠️
-- Wenn [MAX 3000 ZEICHEN] steht: Schreibe GENAU 2800-3000 Zeichen (NICHT weniger!)
-- Wenn [MAX 2000 ZEICHEN] steht: Schreibe GENAU 1800-2000 Zeichen (NICHT weniger!)
-- Wenn [MAX 500 ZEICHEN] steht: Schreibe GENAU 400-500 Zeichen (NICHT weniger!)
-- TOLERANZ: Maximal ±200 Zeichen vom Limit!
+=== ZEICHEN- UND WORTLIMITS (ABSOLUT KRITISCH!) ===
+⚠️ JEDE ANTWORT MUSS DAS LIMIT OPTIMAL AUSNUTZEN (+/- 10-15%)! ⚠️
+KI-Modelle verschätzen sich bei Zeichen. Halte dich primär an WORT-Grenzen (ca. 7 Zeichen pro Wort):
+- Wenn [MAX 3000 ZEICHEN] steht: Schreibe ca. 380-420 Wörter (2600-2900 Zeichen).
+- Wenn [MAX 2000 ZEICHEN] steht: Schreibe ca. 250-280 Wörter (1700-1950 Zeichen).
+- Wenn [MAX 1500 ZEICHEN] steht: Schreibe ca. 180-210 Wörter (1200-1450 Zeichen).
+- Wenn [MAX 500 ZEICHEN] steht: Schreibe ca. 60-70 Wörter (400-480 Zeichen).
+- TOLERANZ: +/- 10-15% vom Zielwert!
 - ZU KURZE Antworten sind GENAUSO SCHLECHT wie zu lange!
 - Nutze den verfügbaren Platz VOLLSTÄNDIG aus - das zeigt Gründlichkeit!
-- ZÄHLE die Zeichen beim Schreiben und passe die Länge an!
+- ZÄHLE die Wörter beim Schreiben und passe die Länge an!
 
 === TEXTFORMAT (KRITISCH!) ===
 - Schreibe KOHÄRENTE BLOCKTEXTE, keine unstrukturierten Textblöcke. Nutze immer Leerzeilen zur Trennung!
@@ -1077,11 +1088,12 @@ Beginne DIREKT mit dem JSON-Objekt, kein einleitender Text.`;
 
   const systemContext = `Du bist ein erfahrener Erasmus+ Antragsschreiber. Du schreibst SACHLICH und NÜCHTERN wie ein professioneller Projektmanager.
 
-⚠️⚠️⚠️ ZEICHENLIMITS - HÖCHSTE PRIORITÄT! ⚠️⚠️⚠️
-Du MUSST das Zeichenlimit OPTIMAL ausnutzen (±200 Zeichen):
-- [MAX 3000 ZEICHEN] → Schreibe 2800-3000 Zeichen (NICHT 1500!)
-- [MAX 2000 ZEICHEN] → Schreibe 1800-2000 Zeichen (NICHT 1000!)
-- [MAX 500 ZEICHEN] → Schreibe 400-500 Zeichen (NICHT 200!)
+⚠️⚠️⚠️ ZEICHEN- UND WORTLIMITS - HÖCHSTE PRIORITÄT! ⚠️⚠️⚠️
+Du MUSST das Limit OPTIMAL ausnutzen (+/- 10-15%). Da KIs Zeichen schlecht schätzen, halte dich an die WÖRTER-Ziele:
+- [MAX 3000 ZEICHEN] → Schreibe 380-420 Wörter (NICHT nur 200!)
+- [MAX 2000 ZEICHEN] → Schreibe 250-280 Wörter (NICHT nur 150!)
+- [MAX 1500 ZEICHEN] → Schreibe 180-210 Wörter
+- [MAX 500 ZEICHEN] → Schreibe 60-70 Wörter
 ZU KURZE Antworten werden als UNVOLLSTÄNDIG gewertet!
 
 🚫🚫🚫 ABSOLUT VERBOTEN - SOFORTIGE DISQUALIFIKATION! 🚫🚫🚫
@@ -1109,7 +1121,7 @@ KRITISCHE FORMATIERUNGS-REGELN:
 ⚠️ WENN DIE FRAGE "Project Title" ODER "Project Acronym" BEINHALTET, MUSS DIE ANTWORT AUF ENGLISCH SEIN, EGAL WELCHE SPRACHE VORHER EINGESTELLT WAR!
 
 QUALITÄTS-CHECK vor jeder Antwort:
-☑️ Hat die Antwort die RICHTIGE LÄNGE? (±200 Zeichen vom Limit)
+☑️ Hat die Antwort die RICHTIGE LÄNGE? (Erreicht sie die geforderte Wortanzahl?)
 ☑️ Klingt es SACHLICH und PROFESSIONELL (nicht belehrend)?
 ☑️ Enthält es KEINE erfundenen Begriffe oder Pseudo-Methoden?
 ☑️ Sind Zahlen und Fakten KONKRET und überprüfbar?
@@ -2388,7 +2400,13 @@ async function generateActivitiesFieldBundled(
   };
 
   const fd = fieldDescriptions[fieldType];
-  const minChars = Math.round(fd.charLimit * 0.85);
+  const isGerman = language === 'de';
+
+  // VARIANTE 1: Buffer for German text so English translation doesn't exceed EU limits
+  const targetChars = isGerman ? Math.round(fd.charLimit * 0.80) : Math.round(fd.charLimit * 0.90);
+  const minChars = isGerman ? Math.round(fd.charLimit * 0.70) : Math.round(fd.charLimit * 0.80);
+  const targetWords = Math.round(targetChars / 7);
+  const minWords = Math.round(minChars / 7);
 
   // Include cross-step context for coherent activities
   const stepContext = buildStepContext(state, 6);
@@ -2409,21 +2427,23 @@ FRAGE FÜR JEDE AKTIVITÄT:
 ${fd.question}
 
 REGELN:
-- Jeder Text MUSS mindestens ${minChars} Zeichen lang sein (Ziel: ${fd.charLimit} Zeichen)
+- Jeder Text MUSS ca. ${targetWords} Wörter umfassen (+/- 10-15%). 
+- Absolutes MINIMUM: ${minWords} Wörter (${minChars} Zeichen) pro Aktivität!
 - Nutze **fett** für wichtige Begriffe und Überschriften
 - Nutze - für Aufzählungen
 - Jede Aktivität muss UNTERSCHIEDLICH sein (verschiedene Schwerpunkte!)
 - Schreibe auf ${langName}
 - Nenne konkrete Zahlen, Tools, Methoden und Zielgruppen
+- KI-Modelle verschätzen sich bei Zeichen. Bitte halte dich zwingend an die Wortanzahl!
 
 Antworte NUR mit einem validen JSON-Objekt:
 {
-  "activity_1": "Ausführlicher Text für Aktivität 1 (mind. ${minChars} Zeichen)...",
-  "activity_2": "Ausführlicher Text für Aktivität 2 (mind. ${minChars} Zeichen)...",
-  "activity_3": "Ausführlicher Text für Aktivität 3 (mind. ${minChars} Zeichen)..."
+  "activity_1": "Ausführlicher Text für Aktivität 1 (ca. ${targetWords} Wörter)...",
+  "activity_2": "Ausführlicher Text für Aktivität 2 (ca. ${targetWords} Wörter)...",
+  "activity_3": "Ausführlicher Text für Aktivität 3 (ca. ${targetWords} Wörter)..."
 }`;
 
-  const systemContext = `Du bist EU-Projektexperte für Erasmus+ Anträge. Generiere Aktivitätsbeschreibungen im JSON-Format. Jedes Feld muss substantiell, konkret und ausführlich sein. NIEMALS unter ${minChars} Zeichen pro Aktivität. Antworte NUR mit validem JSON.`;
+  const systemContext = `Du bist EU-Projektexperte für Erasmus+ Anträge. Generiere Aktivitätsbeschreibungen im JSON-Format. Jedes Feld muss substantiell, konkret und ausführlich sein. NIEMALS unter ${minWords} Wörtern pro Aktivität. Antworte NUR mit validem JSON.`;
 
   const response = await callGeminiForPipeline(prompt, systemContext, 0.7);
 
@@ -3208,14 +3228,13 @@ ${isManagement ? `
 
 === FORMAT ===
 Antworte als JSON. ACHTUNG auf Mindestlängen!
-{
   "objectives": ["Ziel 1 (1-2 Sätze)", "Ziel 2 (1-2 Sätze)", "Ziel 3 (1-2 Sätze)", "Ziel 4 (optional)"],
-  "description": "MINDESTENS 2500 Zeichen! Ausführliche WP-Beschreibung mit: Kontext, Ansatz, Methodik, erwartete Ergebnisse, Zusammenhang mit Projektzielen. Als Fließtext mit Markdown-Formatierung.",
+  "description": "MINDESTENS ca. ${language === 'de' ? '280-320' : '350-400'} Wörter (${language === 'de' ? '2000-2400' : '2500-3000'} Zeichen)! Ausführliche WP-Beschreibung mit: Kontext, Ansatz, Methodik, erwartete Ergebnisse, Zusammenhang mit Projektzielen. Als Fließtext mit Markdown-Formatierung.",
   "activities": [
     {
       "title": "Aktivität Titel",
-      "description": "MINDESTENS 800 Zeichen pro Aktivität! Beschreibe: Was wird gemacht? Wie wird es durchgeführt? Welche Methoden? Welche Ergebnisse werden erwartet?",
-      "methodology": "Detaillierte Methodik (mind. 200 Zeichen): Workshops, Peer-Learning, Online-Kollaboration, etc.",
+      "description": "MINDESTENS ca. ${language === 'de' ? '90-110' : '120-150'} Wörter (${language === 'de' ? '600-800' : '800-1000'} Zeichen)! Beschreibe: Was wird gemacht? Wie wird es durchgeführt? Welche Methoden? Welche Ergebnisse werden erwartet?",
+      "methodology": "Detaillierte Methodik (mind. 40 Wörter): Workshops, Peer-Learning, Online-Kollaboration, etc.",
       "targetGroups": "Spezifische Zielgruppen mit Zahlen (z.B. 20 Lehrende, 50 Studierende)",
       "monthStart": 1,
       "monthEnd": 6,
@@ -3226,7 +3245,7 @@ Antworte als JSON. ACHTUNG auf Mindestlängen!
   "deliverables": [
     {
       "title": "Deliverable Titel",
-      "description": "Mind. 200 Zeichen: Was genau wird produziert? Format? Umfang? Zielgruppe?",
+      "description": "Mind. 40 Wörter: Was genau wird produziert? Format? Umfang? Zielgruppe?",
       "type": "Report/Toolkit/Training Material/Platform/Event",
       "completionMonth": 12
     }
@@ -3239,10 +3258,10 @@ Antworte als JSON. ACHTUNG auf Mindestlängen!
     }
   ],
   "partnerRoles": {
-    "${leadPartnerName}": "Lead Rolle mit konkreten Aufgaben (mind. 150 Zeichen)",
+    "${leadPartnerName}": "Lead Rolle mit konkreten Aufgaben (mind. 30 Wörter)",
     "Partner 2": "Spezifischer Beitrag mit Aufgaben..."
   },
-  "budgetRationale": "MINDESTENS 4500 Zeichen (Ziel: 5000)! Erkläre SEHR AUSFÜHRLICH: Wie wird das Budget verwendet? Welche Kostenpositionen gibt es? Warum ist jede Kostenposition notwendig und angemessen? Referenziere Expertentage, Reisekosten, Unterkunft, Materialien, Veranstaltungskosten etc. Begründe die Kosteneffizienz und den Mehrwert für das Projekt. Erkläre wie das Budget zur Erreichung der WP-Ziele beiträgt."
+  "budgetRationale": "MINDESTENS ca. ${language === 'de' ? '500-550' : '650-700'} Wörter (${language === 'de' ? '3500-4000' : '4500-5000'} Zeichen)! Erkläre SEHR AUSFÜHRLICH: Wie wird das Budget verwendet? Welche Kostenpositionen gibt es? Warum ist jede Kostenposition..."
 }
 
 === FORMATIERUNG ===
@@ -3256,10 +3275,11 @@ Schreibe auf ${LANGUAGE_NAMES[language as Language] || language}.`;
 
   const systemContext = `Du bist ein Erasmus+ WP-Experte. Generiere detaillierte, professionelle Work Package Inhalte.
 
-⚠️⚠️⚠️ KRITISCH - TEXTLÄNGE ⚠️⚠️⚠️
-- "description" MUSS mindestens 2500-3000 Zeichen haben (ausführlicher Fließtext!)
-- Jede "activities" Beschreibung MUSS 800-1200 Zeichen haben
-- "budgetRationale" MUSS 4500-5000 Zeichen haben! Das ist ein langes Feld!
+⚠️⚠️⚠️ KRITISCH - TEXTLÄNGE (+/- 10-15% Toleranz) ⚠️⚠️⚠️
+- "description" MUSS ca. ${language === 'de' ? '280-320' : '350-400'} Wörter haben (ausführlicher Fließtext!)
+- "activities" Beschreibung MUSS ca. ${language === 'de' ? '90-110' : '120-150'} Wörter haben
+- "budgetRationale" MUSS ca. ${language === 'de' ? '500-550' : '650-700'} Wörter haben! Das ist ein extrem langes Feld!
+- KI-Modelle verschätzen sich bei Zeichen, halte dich streng an die WORT-Grenzen!
 - ZU KURZE Texte werden als UNVOLLSTÄNDIG abgelehnt!
 - Schreibe AUSFÜHRLICH mit konkreten Details, Methoden, Zeitrahmen
 
