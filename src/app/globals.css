@@ -1,8 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #475569;
+  --accent: #dbeafe;
+  --accent-foreground: #1e40af;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --border: #e2e8f0;
+  --ring: #2563eb;
+  --radius: 0.5rem;
+
+  /* Erasmus+ specific colors */
+  --erasmus-blue: #003399;
+  --erasmus-yellow: #ffcc00;
+  --success: #22c55e;
+  --warning: #f59e0b;
 }
 
 @theme inline {
@@ -14,13 +35,69 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f172a;
+    --foreground: #f8fafc;
+    --card: #1e293b;
+    --card-foreground: #f8fafc;
+    --secondary: #1e293b;
+    --secondary-foreground: #cbd5e1;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --border: #334155;
   }
+}
+
+* {
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
+}
+
+/* Score indicators */
+.score-excellent { color: #22c55e; }
+.score-good { color: #84cc16; }
+.score-adequate { color: #f59e0b; }
+.score-weak { color: #ef4444; }
+
+/* Progress bar animation */
+@keyframes progress-fill {
+  from { width: 0%; }
+}
+
+.progress-animated {
+  animation: progress-fill 1s ease-out;
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
 }
