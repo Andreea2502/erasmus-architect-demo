@@ -122,6 +122,7 @@ interface ConceptState {
   // Step 6: Detailed Concept
   detailedConcept: string | null;
   isGeneratingDetailedConcept: boolean;
+  isTranslatingConcept?: boolean;
   detailedConceptError?: string;
 }
 
@@ -258,6 +259,7 @@ export function ConceptDeveloper({ resumeProjectId }: { resumeProjectId?: string
     wpGenerated: false,
     detailedConcept: null,
     isGeneratingDetailedConcept: false,
+    isTranslatingConcept: false,
   });
 
   // Helper to update state
@@ -1386,6 +1388,36 @@ REGELN FÜR DIE AUSGABE:
       update({
         detailedConceptError: e?.message || 'Generierung fehlgeschlagen. Bitte erneut versuchen.',
         isGeneratingDetailedConcept: false,
+      });
+    }
+  };
+
+  const translateConcept = async () => {
+    if (!state.detailedConcept) return;
+
+    update({ isTranslatingConcept: true, detailedConceptError: undefined });
+    try {
+      const prompt = `Du bist ein professioneller Übersetzer für EU-Fördermittelanträge (Erasmus+). 
+Deine Aufgabe ist es, den folgenden Konzeptentwurf vom Deutschen in ein professionelles, formelles und überzeugendes britisches Englisch zu übersetzen.
+Achte darauf, dass Erasmus+ spezifische Fachbegriffe (z.B. "Work Package", "Deliverables", "Target Group", "Dissemination") korrekt verwendet werden.
+Erhalte die Markdown-Formatierung strikt bei. Gib mir AUSSCHLIESSLICH den übersetzten Text zurück, keinen Kommentar davor oder danach.
+
+KONZEPT-ENTWURF:
+${state.detailedConcept}`;
+
+      const response = await generateContentAction(prompt, 'Du bist ein Erasmus+ Übersetzungs-Experte. Antworte NUR im Markdown-Format.', 0.2, 60000);
+
+      let finalMarkdown = response;
+      if (finalMarkdown.startsWith('\`\`\`markdown')) {
+        finalMarkdown = finalMarkdown.replace(/^\`\`\`markdown\n/, '').replace(/\n\`\`\`$/, '');
+      }
+
+      update({ detailedConcept: finalMarkdown.trim(), isTranslatingConcept: false });
+    } catch (e: any) {
+      console.error('Translation error:', e);
+      update({
+        detailedConceptError: e?.message || 'Übersetzung fehlgeschlagen. Bitte erneut versuchen.',
+        isTranslatingConcept: false,
       });
     }
   };
@@ -2969,15 +3001,31 @@ REGELN FÜR DIE AUSGABE:
                       Detaillierter Konzeptentwurf (2-3 Seiten)
                     </span>
                     {state.detailedConcept && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => window.print()}
-                        className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Als PDF speichern
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={translateConcept}
+                          disabled={state.isTranslatingConcept}
+                          className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                        >
+                          {state.isTranslatingConcept ? (
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Globe className="h-4 w-4 mr-2" />
+                          )}
+                          Auf Englisch übersetzen
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.print()}
+                          className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Als PDF speichern
+                        </Button>
+                      </div>
                     )}
                   </h4>
                   <p className="text-sm text-gray-500 mb-6">
