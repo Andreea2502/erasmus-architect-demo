@@ -578,7 +578,7 @@ export function AppShell({ children }: AppShellProps) {
         className={`pt-16 min-h-screen transition-all duration-300 ${sidebarOpen
           ? sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
           : "lg:ml-0"
-          } print:pt-0 print:ml-0 lg:print:ml-0`}
+          } print:pt-0 print:ml-0 lg:print:ml-0 print:min-h-0 print:h-auto print:overflow-visible`}
       >
         {/* Breadcrumbs & Back Button */}
         {showBackButton && (
