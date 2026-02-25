@@ -97,19 +97,23 @@ async function withRetry<T>(
                 rateLimitedKeys.add(keyIndex);
                 keyRateLimitedAt.set(keyIndex, Date.now());
 
-                // If ALL keys are rate-limited in this call: fail fast
+                // If ALL keys are rate-limited in this call: we should wait longer instead of failing fast!
                 if (rateLimitedKeys.size >= keys.length) {
-                    console.error(`[Gemini] ${taskName}: ALL ${keys.length} API key(s) are rate-limited (429). Failing fast.`);
-                    console.error(`[Gemini] LAST ERROR:`, error.message);
-                    throw new Error(
-                        `API-Rate-Limit erreicht (429). Alle ${keys.length} API-Keys sind temporär gesperrt. ` +
-                        `Bitte warte 1-2 Minuten und versuche es erneut. ` +
-                        `(Gemini Free-Tier: max 10 Requests/Minute, 250 Requests/Tag)`
-                    );
-                }
+                    console.warn(`[Gemini] ${taskName}: ALL ${keys.length} API key(s) are rate-limited. Waiting 20s before next retry. Attempt ${attempt}/${maxRetries}`);
 
-                // Try the next key (it hasn't been rate-limited yet in this call)
-                if (keys.length > 1) {
+                    // Only fail fast if we've exhausted all attempts
+                    if (attempt >= maxRetries) {
+                        throw new Error(
+                            `API-Rate-Limit erreicht (429). Alle ${keys.length} API-Keys sind temporär gesperrt. ` +
+                            `Bitte warte 1-2 Minuten und versuche es erneut.`
+                        );
+                    }
+
+                    // Wait 20 seconds, then clear rateLimitedKeys so we can try the keys again
+                    await new Promise(resolve => setTimeout(resolve, 20000));
+                    rateLimitedKeys.clear();
+                } else if (keys.length > 1) {
+                    // Try the next key (it hasn't been rate-limited yet in this call)
                     const prevIndex = keyIndex;
                     keyIndex = (keyIndex + 1) % keys.length;
                     console.warn(`[Gemini] ${taskName} rate limited on key ${prevIndex + 1}/${keys.length}. Switching to key ${keyIndex + 1}. Attempt ${attempt}/${maxRetries}`);

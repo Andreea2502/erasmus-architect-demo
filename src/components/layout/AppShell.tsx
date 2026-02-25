@@ -347,7 +347,7 @@ export function AppShell({ children }: AppShellProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 print:block print:min-h-0 print:h-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Search Modal */}
       {searchOpen && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]">
@@ -423,7 +423,7 @@ export function AppShell({ children }: AppShellProps) {
       )}
 
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 shadow-sm no-print">
+      <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 shadow-sm print:hidden">
         <div className="flex items-center gap-4">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -495,7 +495,7 @@ export function AppShell({ children }: AppShellProps) {
         className={`fixed top-16 left-0 bottom-0 bg-white border-r border-gray-200 transition-all duration-300 z-40 flex flex-col ${sidebarOpen
           ? sidebarCollapsed ? "w-20" : "w-72"
           : "w-0 -translate-x-full lg:translate-x-0 lg:w-0"
-          } no-print`}
+          } print:hidden`}
       >
         {sidebarOpen && (
           <>
@@ -582,7 +582,7 @@ export function AppShell({ children }: AppShellProps) {
       >
         {/* Breadcrumbs & Back Button */}
         {showBackButton && (
-          <div className="sticky top-16 z-20 bg-white/80 backdrop-blur-sm border-b border-gray-100 no-print">
+          <div className="sticky top-16 z-20 bg-white/80 backdrop-blur-sm border-b border-gray-100 print:hidden">
             <div className="px-6 py-3 flex items-center gap-4">
               <button
                 onClick={() => router.back()}

@@ -1422,6 +1422,69 @@ ${state.detailedConcept}`;
     }
   };
 
+  const exportToPDF = () => {
+    const printContent = document.getElementById('pdf-print-area');
+    if (!printContent) return;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      const selectedConcept = state.concepts.find(c => c.id === state.selectedConceptId);
+
+      // Get all styles from the parent document
+      const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+        .map(style => style.outerHTML)
+        .join('\\n');
+
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>\${selectedConcept?.title || 'Konzept'} - Erasmus+</title>
+            \${styles}
+            <style>
+              body { 
+                background: white !important;
+                padding: 40px !important; 
+                max-width: 900px;
+                margin: 0 auto;
+              }
+              .prose { max-width: none !important; }
+              @media print {
+                body { padding: 0 !important; }
+                @page { margin: 2cm; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="text-3xl font-bold mb-6 border-b pb-4">\${selectedConcept?.title || ''}</div>
+            <div class="text-sm text-gray-600 mb-8 font-mono">
+              \${selectedConcept?.acronym || ''} | \${state.actionType} | \${SECTORS.find(s => s.value === state.sector)?.label || ''}
+            </div>
+            <div class="prose max-w-none prose-indigo">
+              \${printContent.innerHTML}
+            </div>
+          </body>
+        </html>
+      `);
+      doc.close();
+
+      setTimeout(() => {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        }
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 2000);
+      }, 800);
+    }
+  };
+
   // ============================================================================
   // STEP 6: Export to Pipeline
   // ============================================================================
@@ -3019,7 +3082,7 @@ ${state.detailedConcept}`;
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => window.print()}
+                          onClick={exportToPDF}
                           className="text-blue-600 border-blue-200 hover:bg-blue-50"
                         >
                           <FileText className="h-4 w-4 mr-2" />
@@ -3081,9 +3144,9 @@ ${state.detailedConcept}`;
                   )}
                 </div>
 
-                {/* Print area for the window.print() triggered version */}
+                {/* Print area for the iframe export */}
                 {state.detailedConcept && (
-                  <div className="print-only text-black bg-white p-8">
+                  <div id="pdf-print-area" className="hidden">
                     <div className="text-3xl font-bold mb-6 border-b pb-4">{selectedConcept.title}</div>
                     <div className="text-sm text-gray-600 mb-8 font-mono">
                       {selectedConcept.acronym} | {state.actionType} | {SECTORS.find(s => s.value === state.sector)?.label}
