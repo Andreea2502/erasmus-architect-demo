@@ -122,6 +122,7 @@ interface ConceptState {
   // Step 6: Detailed Concept
   detailedConcept: string | null;
   isGeneratingDetailedConcept: boolean;
+  additionalInstructions?: string;
   isTranslatingConcept?: boolean;
   detailedConceptError?: string;
 }
@@ -259,6 +260,7 @@ export function ConceptDeveloper({ resumeProjectId }: { resumeProjectId?: string
     wpGenerated: false,
     detailedConcept: null,
     isGeneratingDetailedConcept: false,
+    additionalInstructions: '',
     isTranslatingConcept: false,
   });
 
@@ -1349,6 +1351,9 @@ ${sourceContext}
 
 STRUKTUR/ARBEITSPAKETE:
 ${wpText}
+
+WEITERE ANWEISUNGEN / SCHWERPUNKTE (falls vorhanden):
+${state.additionalInstructions ? state.additionalInstructions : 'Keine besonderen Zusatzanweisungen.'}
 
 AUFGABE:
 Schreibe einen detaillierten Konzeptentwurf, der als Grundlage für den späteren EU-Förderantrag dient. Das Dokument muss professionell strukturiert sein und folgende Abschnitte enthalten:
@@ -3135,8 +3140,20 @@ ${state.detailedConcept}`;
                     )}
                   </h4>
                   <p className="text-sm text-gray-500 mb-6">
-                    Erstelle aus deinen bisherigen Eingaben einen professionellen, zusammenhängenden Rohentwurf deines Konzeptes. Optional kannst du ihn direkt als PDF herunterladen.
+                    Erstelle aus deinen bisherigen Eingaben einen professionellen, zusammenhängenden Rohentwurf deines Konzeptes.
                   </p>
+
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Zusätzliche Schwerpunkte oder Anweisungen (Optional)
+                    </label>
+                    <Textarea
+                      placeholder="Gibt es Themen aus Schritt 1 (z.B. Resilienz, KI-Ethik, Inklusion), die im finalen Rohentwurf auf jeden Fall stärker betont werden sollen? Hier eintragen..."
+                      value={state.additionalInstructions || ''}
+                      onChange={(e) => update({ additionalInstructions: e.target.value })}
+                      className="min-h-[100px]"
+                    />
+                  </div>
 
                   {!state.detailedConcept ? (
                     <Button
@@ -3164,7 +3181,7 @@ ${state.detailedConcept}`;
                         </ReactMarkdown>
                       </div>
 
-                      <div className="p-3 border-t bg-white flex justify-end">
+                      <div className="p-3 border-t bg-white flex justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -3173,7 +3190,7 @@ ${state.detailedConcept}`;
                           className="text-gray-500 hover:text-blue-600"
                         >
                           <RefreshCw className="h-4 w-4 mr-2" />
-                          Neu generieren
+                          Mit neuen Anweisungen generieren
                         </Button>
                       </div>
                     </div>
