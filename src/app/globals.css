@@ -78,14 +78,27 @@ body {
 }
 
 /* Score indicators */
-.score-excellent { color: #22c55e; }
-.score-good { color: #84cc16; }
-.score-adequate { color: #f59e0b; }
-.score-weak { color: #ef4444; }
+.score-excellent {
+  color: #22c55e;
+}
+
+.score-good {
+  color: #84cc16;
+}
+
+.score-adequate {
+  color: #f59e0b;
+}
+
+.score-weak {
+  color: #ef4444;
+}
 
 /* Progress bar animation */
 @keyframes progress-fill {
-  from { width: 0%; }
+  from {
+    width: 0%;
+  }
 }
 
 .progress-animated {
@@ -100,4 +113,36 @@ body {
 .card-hover:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Print Specific Overrides to prevent blank pages */
+@media print {
+  * {
+    overflow: visible !important;
+  }
+
+  html,
+  body,
+  #__next,
+  main {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+@media screen {
+  .print-only {
+    display: none !important;
+  }
 }

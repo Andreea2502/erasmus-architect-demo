@@ -2994,7 +2994,7 @@ ${state.detailedConcept}`;
                 </div>
 
                 {/* Detailed Concept Generation */}
-                <div className="bg-white rounded-xl border p-4 sm:p-6 print:hidden">
+                <div className="bg-white rounded-xl border p-4 sm:p-6 no-print">
                   <h4 className="font-semibold text-gray-900 mb-2 flex items-center justify-between">
                     <span className="flex items-center gap-2">
                       <FileText className="h-5 w-5 text-blue-500" />
@@ -3083,7 +3083,7 @@ ${state.detailedConcept}`;
 
                 {/* Print area for the window.print() triggered version */}
                 {state.detailedConcept && (
-                  <div className="hidden print:block text-black bg-white p-8">
+                  <div className="print-only text-black bg-white p-8">
                     <div className="text-3xl font-bold mb-6 border-b pb-4">{selectedConcept.title}</div>
                     <div className="text-sm text-gray-600 mb-8 font-mono">
                       {selectedConcept.acronym} | {state.actionType} | {SECTORS.find(s => s.value === state.sector)?.label}
@@ -3096,7 +3096,7 @@ ${state.detailedConcept}`;
                   </div>
                 )}
 
-                <div className="relative flex items-center py-2 print:hidden">
+                <div className="relative flex items-center py-2 no-print">
                   <div className="flex-grow border-t border-gray-200"></div>
                   <span className="flex-shrink-0 mx-4 text-gray-400 text-sm">Bereit für den nächsten Schritt?</span>
                   <div className="flex-grow border-t border-gray-200"></div>
@@ -3106,7 +3106,7 @@ ${state.detailedConcept}`;
                 <Button
                   onClick={exportToPipeline}
                   variant="outline"
-                  className="w-full text-gray-700 h-14 text-lg border-2 hover:bg-gray-50 print:hidden"
+                  className="w-full text-gray-700 h-14 text-lg border-2 hover:bg-gray-50 no-print"
                 >
                   <ArrowRight className="h-5 w-5 mr-2 text-gray-400" />
                   Zur detaillierten Antrags-Entwicklung (Project Generator)
