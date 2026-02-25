@@ -1444,8 +1444,8 @@ ${state.detailedConcept}`;
         <!DOCTYPE html>
         <html>
           <head>
-            <title>\${selectedConcept?.title || 'Konzept'} - Erasmus+</title>
-            \${styles}
+            <title>${selectedConcept?.title || 'Konzept'} - Erasmus+</title>
+            ${styles}
             <style>
               body { 
                 background: white !important;
@@ -1461,12 +1461,12 @@ ${state.detailedConcept}`;
             </style>
           </head>
           <body>
-            <div class="text-3xl font-bold mb-6 border-b pb-4">\${selectedConcept?.title || ''}</div>
+            <div class="text-3xl font-bold mb-6 border-b pb-4">${selectedConcept?.title || ''}</div>
             <div class="text-sm text-gray-600 mb-8 font-mono">
-              \${selectedConcept?.acronym || ''} | \${state.actionType} | \${SECTORS.find(s => s.value === state.sector)?.label || ''}
+              ${selectedConcept?.acronym || ''} | ${state.actionType} | ${SECTORS.find(s => s.value === state.sector)?.label || ''}
             </div>
             <div class="prose max-w-none prose-indigo">
-              \${printContent.innerHTML}
+              ${printContent.innerHTML}
             </div>
           </body>
         </html>
