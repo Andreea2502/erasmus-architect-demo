@@ -820,6 +820,8 @@ RECHERCHE-ERGEBNISSE:
 ${sourceContext}
 ${allSourceContext ? `\nWEITERE QUELLEN:\n${allSourceContext}` : ''}
 
+${state.additionalInstructions ? `ZUSÄTZLICHE ANWEISUNGEN / FEHLENDE THEMEN (UNBEDINGT INTEGRIEREN!):\n${state.additionalInstructions}\n` : ''}
+
 AUFGABE: Entwickle 3 UNTERSCHIEDLICHE Konzeptvorschläge für ein Erasmus+ ${state.actionType} Projekt.
 Jedes Konzept soll einen ANDEREN Ansatz verfolgen, ABER alle Konzepte MÜSSEN den definierten Erasmus+ Schwerpunkt ("${state.priorityFocus || 'Kein spezifischer Schwerpunkt'}") zentral als roter Faden behandeln!
 
@@ -1067,6 +1069,8 @@ AKTIONSTYP: ${state.actionType}${isKA210 ? ' (Budget max. 60k, Dauer max. 24 Mon
 RECHERCHE-QUELLEN:
 ${sourceContext}
 
+${state.additionalInstructions ? `ZUSÄTZLICHE ANWEISUNGEN / FEHLENDE THEMEN (UNBEDINGT BEI DEN ZIELEN BERÜCKSICHTIGEN!):\n${state.additionalInstructions}\n` : ''}
+
 AUFGABE: Definiere ${objectiveCount} SMART-Ziele für dieses Projekt.
 Jedes Ziel muss:
 - Specific, Measurable, Achievable, Relevant, Time-bound sein
@@ -1216,6 +1220,7 @@ RAHMENBEDINGUNGEN KA210:
 - KEINE formalen Work Packages, sondern direkte AKTIVITÄTEN
 - Einfache, umsetzbare Struktur
 
+${state.additionalInstructions ? `ZUSÄTZLICHE ANWEISUNGEN / FEHLENDE THEMEN (UNBEDINGT ALS AKTIVITÄTEN/ERGEBNISSE INTEGRIEREN!):\n${state.additionalInstructions}\n` : ''}
 AUFGABE: Erstelle 3-5 Projektaktivitäten für dieses KA210 Projekt.
 Jede Aktivität soll:
 - Einen klaren Zweck und Inhalt haben
@@ -1258,6 +1263,7 @@ ${selectedConcept.mainOutputs.join('\n')}
 KONSORTIUM:
 ${consortiumText}
 
+${state.additionalInstructions ? `ZUSÄTZLICHE ANWEISUNGEN / FEHLENDE THEMEN (UNBEDINGT IN DIE WORK PACKAGES INTEGRIEREN!):\n${state.additionalInstructions}\n` : ''}
 AUFGABE: Erstelle eine logische WP-Struktur (4-5 Work Packages + WP1 Management).
 Jedes WP soll:
 - Einen klaren Zweck haben
@@ -1673,6 +1679,24 @@ ${state.detailedConcept}`;
   // ============================================================================
   // RENDER
   // ============================================================================
+
+  const AdditionalInstructionsField = () => (
+    <div className="mb-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+      <label className="block text-sm font-semibold text-blue-900 mb-2 flex items-center gap-2">
+        <Lightbulb className="h-4 w-4" />
+        Spezifische KI-Anweisungen & fehlende Themen (Optional)
+      </label>
+      <p className="text-xs text-blue-700 mb-3">
+        Möchtest du Aspekte ergänzen, die bisher zu kurz kamen (z.B. "Fokus auf nachhaltiges Prompting")? Diese Anweisungen lenken die Generierung von Konzepten, Zielen, Work Packages und dem Entwurf.
+      </p>
+      <Textarea
+        placeholder="Hier gewünschte Schwerpunkte oder exakte Vorgaben für die KI eintragen..."
+        value={state.additionalInstructions || ''}
+        onChange={(e) => update({ additionalInstructions: e.target.value })}
+        className="min-h-[80px] bg-white border-blue-200 focus:border-blue-400 focus:ring-blue-400"
+      />
+    </div>
+  );
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -2271,17 +2295,20 @@ ${state.detailedConcept}`;
 
             {/* Generate Concepts */}
             {state.sources.length > 0 && (
-              <Button
-                onClick={() => { update({ conceptError: undefined }); generateConcepts(); }}
-                disabled={isGenerating}
-                className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white h-12 text-base"
-              >
-                {isGenerating ? (
-                  <><RefreshCw className="h-5 w-5 animate-spin mr-2" /> Konzepte werden generiert...</>
-                ) : (
-                  <><Sparkles className="h-5 w-5 mr-2" /> 3 Konzeptvorschläge generieren</>
-                )}
-              </Button>
+              <div className="mt-8">
+                {!state.conceptsGenerated && AdditionalInstructionsField()}
+                <Button
+                  onClick={() => { update({ conceptError: undefined }); generateConcepts(); }}
+                  disabled={isGenerating}
+                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white h-12 text-base"
+                >
+                  {isGenerating ? (
+                    <><RefreshCw className="h-5 w-5 animate-spin mr-2" /> Konzepte werden generiert...</>
+                  ) : (
+                    <><Sparkles className="h-5 w-5 mr-2" /> 3 Konzeptvorschläge generieren</>
+                  )}
+                </Button>
+              </div>
             )}
 
             {/* Error Message */}
@@ -2705,6 +2732,7 @@ ${state.detailedConcept}`;
 
             {!state.objectivesGenerated ? (
               <>
+                {AdditionalInstructionsField()}
                 <Button
                   onClick={() => { update({ objectivesError: undefined }); generateObjectives(); }}
                   disabled={isGenerating}
@@ -2893,15 +2921,16 @@ ${state.detailedConcept}`;
 
             {!state.wpGenerated ? (
               <>
+                {AdditionalInstructionsField()}
                 <Button
                   onClick={() => { update({ wpError: undefined }); generateWPStructure(); }}
                   disabled={isGenerating}
-                  className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white h-12 text-base"
+                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white h-12 text-base"
                 >
                   {isGenerating ? (
-                    <><RefreshCw className="h-5 w-5 animate-spin mr-2" /> {state.actionType === 'KA210' ? 'Aktivitäten werden erstellt...' : 'WP-Struktur wird erstellt...'}</>
+                    <><RefreshCw className="h-5 w-5 animate-spin mr-2" /> Struktur wird geplant...</>
                   ) : (
-                    <><Layers className="h-5 w-5 mr-2" /> {state.actionType === 'KA210' ? 'Aktivitäten generieren' : 'WP-Struktur generieren'}</>
+                    <><Layers className="h-5 w-5 mr-2" /> {state.actionType === 'KA210' ? 'Projekt-Schritte' : 'WP-Struktur'} generieren</>
                   )}
                 </Button>
 
@@ -3143,17 +3172,7 @@ ${state.detailedConcept}`;
                     Erstelle aus deinen bisherigen Eingaben einen professionellen, zusammenhängenden Rohentwurf deines Konzeptes.
                   </p>
 
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Zusätzliche Schwerpunkte oder Anweisungen (Optional)
-                    </label>
-                    <Textarea
-                      placeholder="Gibt es Themen aus Schritt 1 (z.B. Resilienz, KI-Ethik, Inklusion), die im finalen Rohentwurf auf jeden Fall stärker betont werden sollen? Hier eintragen..."
-                      value={state.additionalInstructions || ''}
-                      onChange={(e) => update({ additionalInstructions: e.target.value })}
-                      className="min-h-[100px]"
-                    />
-                  </div>
+                  {AdditionalInstructionsField()}
 
                   {!state.detailedConcept ? (
                     <Button
