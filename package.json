@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "mv eslint.config.mjs .eslint.config.tmp && next build; mv .eslint.config.tmp eslint.config.mjs",
     "start": "next start",
     "lint": "eslint"
   },
