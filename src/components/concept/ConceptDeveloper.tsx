@@ -6,14 +6,14 @@ import {
   Layers, ArrowRight, ArrowLeft, Check, Copy, ChevronDown,
   ChevronUp, Sparkles, BookOpen, Globe, Plus, X, Star,
   RefreshCw, Save, Rocket, AlertTriangle, CheckCircle2,
-  FolderOpen, Trash2, XCircle, Scale, Trophy, ThumbsDown, ThumbsUp
+  FolderOpen, Trash2, XCircle, Scale, Trophy, ThumbsDown, ThumbsUp, Mic, MicOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useAppStore } from '@/store/app-store';
 import { useLanguageStore } from '@/store/language-store';
-import { generateContentAction } from '@/app/actions/gemini';
+import { generateContentAction, generateJsonContentAction } from '@/app/actions/gemini';
 import { extractTextFromPDF, extractTextFromDocx } from '@/lib/rag-system';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -100,6 +100,7 @@ interface ConceptState {
   conceptError?: string;
   isComparingConcepts: boolean;
   conceptComparisonResult: any | null;
+  compareConceptsError?: string;
 
   // Step 3: Consortium
   selectedPartners: SelectedPartner[];
@@ -172,6 +173,61 @@ export function ConceptDeveloper({ resumeProjectId }: { resumeProjectId?: string
   const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+  // Microphone state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = language === 'de' ? 'de-DE' : 'en-US';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event: any) => {
+          let currentTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            currentTranscript += event.results[i][0].transcript;
+          }
+          // We only update if it's final to avoid jumbled text during pauses
+          if (event.results[event.results.length - 1].isFinal) {
+            setState(prev => ({ ...prev, idea: prev.idea + (prev.idea ? ' ' : '') + currentTranscript }));
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error("Speech recognition error", event.error);
+          setIsRecording(false);
+          if (event.error === 'not-allowed') {
+            alert('Bitte erlaube den Mikrofonzugriff in deinem Browser.');
+          }
+        };
+
+        recognition.onend = () => {
+          setIsRecording(false);
+        };
+
+        setRecognitionInstance(recognition);
+      }
+    }
+  }, [language]);
+
+  const toggleRecording = () => {
+    if (!recognitionInstance) {
+      alert('Dein Browser unterstützt leider keine Spracherkennung. Bitte nutze Chrome, Edge oder Safari.');
+      return;
+    }
+
+    if (isRecording) {
+      recognitionInstance.stop();
+    } else {
+      recognitionInstance.start();
+      setIsRecording(true);
+    }
+  };
+
   const [state, setState] = useState<ConceptState>({
     idea: '',
     enhancedIdea: '',
@@ -191,6 +247,7 @@ export function ConceptDeveloper({ resumeProjectId }: { resumeProjectId?: string
     conceptsGenerated: false,
     isComparingConcepts: false,
     conceptComparisonResult: null,
+    compareConceptsError: undefined,
     selectedPartners: [],
     partnerSearchQuery: '',
     objectives: [],
@@ -246,6 +303,7 @@ export function ConceptDeveloper({ resumeProjectId }: { resumeProjectId?: string
     conceptsGenerated: false,
     isComparingConcepts: false,
     conceptComparisonResult: null,
+    compareConceptsError: undefined,
     selectedPartners: [],
     partnerSearchQuery: '',
     objectives: [],
@@ -852,7 +910,7 @@ WICHTIG: 3 Konzepte, die sich deutlich voneinander unterscheiden!`;
   const compareConcepts = async () => {
     if (state.concepts.length < 2) return;
 
-    update({ isComparingConcepts: true, conceptComparisonResult: null });
+    update({ isComparingConcepts: true, conceptComparisonResult: null, compareConceptsError: undefined });
 
     try {
       const isKA210 = state.actionType === 'KA210';
@@ -905,16 +963,17 @@ Antworte ZWINGEND im JSON-Format:
   ]
 }`;
 
-      const response = await generateContentAction(prompt, 'Du bist Projekt-Evaluator. Antworte NUR im JSON-Format. Kein Markdown.', 0.7, 45000);
+      const response = await generateJsonContentAction(prompt, 'Du bist Projekt-Evaluator. Antworte NUR im JSON-Format.', 0.5);
       const clean = response.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(clean);
 
       update({ conceptComparisonResult: parsed });
     } catch (e: any) {
       console.error('Concept comparison error:', e);
-      // Im Fehlerfall setzen wir den Zustand zurück, zeigen aber evtl. keinen harten Fehler im Flow
+      update({ compareConceptsError: 'Fehler bei der KI-Bewertung: ' + (e.message || 'Unbekannter Fehler') });
+    } finally {
+      update({ isComparingConcepts: false });
     }
-    update({ isComparingConcepts: false });
   };
 
   // ============================================================================
@@ -990,6 +1049,9 @@ Antworte ZWINGEND im JSON-Format:
       const objectiveCount = isKA210 ? '2-3' : '3-5';
 
       const prompt = `Du bist ein Erasmus+ Projektplaner${isKA210 ? ' für Kleine Partnerschaften (KA210)' : ''}.
+
+URSPRÜNGLICHE IDEE DES NUTZERS:
+"${state.enhancedIdea || state.idea}"
 
 KONZEPT: "${selectedConcept.title}"
 ${selectedConcept.summary}
@@ -1129,6 +1191,9 @@ Antworte im JSON-Format:
       const prompt = isKA210
         ? `Du bist ein Erasmus+ Projektplaner für Kleine Partnerschaften (KA210).
 
+URSPRÜNGLICHE IDEE DES NUTZERS:
+"${state.enhancedIdea || state.idea}"
+
 KONZEPT: "${selectedConcept.title}"
 ${selectedConcept.summary}
 
@@ -1173,6 +1238,9 @@ Antworte im JSON-Format:
 
 WICHTIG: Halte es einfach und realistisch für ein kleines Budget!`
         : `Du bist ein Erasmus+ Work Package Experte.
+
+URSPRÜNGLICHE IDEE DES NUTZERS:
+"${state.enhancedIdea || state.idea}"
 
 KONZEPT: "${selectedConcept.title}"
 ${selectedConcept.summary}
@@ -1691,15 +1759,48 @@ REGELN FÜR DIE AUSGABE:
 
             {/* Idea */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Projektidee - schreib einfach drauf los
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Projektidee - schreib einfach drauf los
+                </label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleRecording}
+                  className={`h-8 px-2 flex items-center gap-1.5 transition-colors ${isRecording
+                    ? 'text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700'
+                    : 'text-gray-500 hover:text-amber-600 hover:bg-amber-50'
+                    }`}
+                >
+                  {isRecording ? (
+                    <>
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                      </span>
+                      <MicOff className="h-4 w-4" />
+                      <span className="text-xs font-medium">Aufnahme stoppen</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="h-4 w-4" />
+                      <span className="text-xs font-medium">Diktieren</span>
+                    </>
+                  )}
+                </Button>
+              </div>
               <Textarea
                 value={state.idea}
                 onChange={e => update({ idea: e.target.value, isEnhanced: false, enhancedIdea: '', enhancedProblem: '' })}
-                placeholder="z.B. Irgendwas mit KI und Erwachsenenbildung, vielleicht ein Toolkit oder so, damit die Leute endlich KI im Unterricht nutzen können..."
-                className="min-h-[100px]"
+                placeholder={isRecording ? "Höre zu..." : "z.B. Irgendwas mit KI und Erwachsenenbildung, vielleicht ein Toolkit oder so, damit die Leute endlich KI im Unterricht nutzen können..."}
+                className={`min-h-[100px] transition-all ${isRecording ? 'border-red-300 ring-2 ring-red-100 bg-red-50/10' : ''}`}
               />
+              {isRecording && (
+                <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  Sprich deine Idee einfach ein. Die KI formuliert es danach professionell für dich um.
+                </p>
+              )}
             </div>
 
             {/* Target Group */}
@@ -2186,6 +2287,16 @@ REGELN FÜR DIE AUSGABE:
                     )}
                   </Button>
                 </div>
+
+                {state.compareConceptsError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex items-start gap-3 mt-4">
+                    <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-bold">Bewertung fehlgeschlagen</p>
+                      <p className="text-sm mt-1">{state.compareConceptsError}</p>
+                    </div>
+                  </div>
+                )}
 
                 {state.conceptComparisonResult && (
                   <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-5 shadow-sm space-y-6">
