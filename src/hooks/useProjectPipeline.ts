@@ -242,6 +242,8 @@ export function useProjectPipeline(initialProjectId?: string) {
             });
 
             const projectIdea: ProjectIdea = {
+                title: project.title,
+                acronym: project.acronym || '',
                 shortDescription: project.problemStatement || project.title,
                 // Use real problem statement so AI has genuine project context
                 mainObjective: project.problemStatement || project.title || 'Erasmus+ Projekt',

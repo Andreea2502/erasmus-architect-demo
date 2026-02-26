@@ -40,6 +40,7 @@ export interface ConsortiumPartner {
 
 export interface ProjectIdea {
   title?: string;
+  acronym?: string;
   shortDescription: string;
   targetGroups: string[];
   mainObjective: string;
@@ -876,6 +877,8 @@ PROJEKT-KONTEXT
 ═══════════════════════════════════════════════════════════════
 Projektidee: ${state.idea.shortDescription || 'Bildungsprojekt'}
 Projekttitel: ${state.projectTitle || 'Wird noch generiert'}
+Akronym: ${state.acronym || 'Wird noch generiert'}
+Aktionstyp: ${state.configuration?.actionType || 'KA220'}
 Sektor: ${state.idea.sector === 'ADU' ? 'Erwachsenenbildung' : state.idea.sector === 'VET' ? 'Berufsbildung' : state.idea.sector === 'SCH' ? 'Schulbildung' : 'Jugend'}
 Zielgruppen: ${state.idea.targetGroups?.join(', ') || 'Jugendliche, Erwachsene'}
 
@@ -1510,7 +1513,8 @@ ${dataAvailable.join('\n')}
 
 === PROJEKT-KONTEXT ===
 Projekttitel: ${state.projectTitle || state.idea.shortDescription}
-Projektsektor: ${state.idea.sector}
+Akronym: ${state.acronym || 'N/A'}
+Aktionstyp: ${state.configuration?.actionType || 'KA220'}
 Projektziel: ${state.idea.mainObjective}
 ${existingTextContext}
 ${instructionContext}
@@ -1637,11 +1641,11 @@ ${existingPartnerText ? 'Der Benutzer hat bereits einen Text geschrieben - baue 
     : typeof existingAnswer === 'string' ? existingAnswer : '';
 
   // Build prompt for single question
-  const prompt = `Du bist ein erfahrener Erasmus+ Antragsberater. Beantworte EINE spezifische Frage.
-
-=== PROJEKT ===
-Titel: ${state.projectTitle || state.idea.shortDescription}
-Akronym: ${state.acronym || 'N/A'}
+  const prompt = `Du bist ein erfahrener Erasmus+ Evaluator.
+    PROJEKT-KONTEXT:
+    Projekttitel: ${state.projectTitle || state.idea.shortDescription}
+    Akronym: ${state.acronym || 'N/A'}
+    Aktionstyp: ${state.configuration?.actionType || 'KA220'}
 Sektor: ${state.idea.sector}
 Partner: ${partnerList}
 Hauptziel: ${state.idea.mainObjective}
@@ -2005,6 +2009,8 @@ export async function generateSinglePartnerAnswer(
   const projectContext = `
 === PROJEKT-KONTEXT ===
 Projekttitel: ${state.projectTitle || state.idea.shortDescription}
+Akronym: ${state.acronym || 'N/A'}
+Aktionstyp: ${state.configuration?.actionType || 'KA220'}
 Sektor: ${state.idea.sector}
 Hauptziel: ${state.idea.mainObjective}
 ${state.originalConcept ? `
@@ -2443,7 +2449,9 @@ AUFGABE: Generiere das Feld "${fd.label}" für alle 3 Aktivitäten von Work Pack
 PROJEKT-KONTEXT:
 Projektidee: ${state.idea.shortDescription || 'Bildungsprojekt'}
 Projekttitel: ${state.projectTitle || 'Wird noch generiert'}
+Akronym: ${state.acronym || 'Wird noch generiert'}
 Sektor: ${state.idea.sector === 'ADU' ? 'Erwachsenenbildung' : state.idea.sector === 'VET' ? 'Berufsbildung' : state.idea.sector === 'SCH' ? 'Schulbildung' : 'Jugend'}
+Aktionstyp: ${state.configuration?.actionType || 'KA220'}
 Zielgruppen: ${state.idea.targetGroups?.join(', ') || 'Jugendliche, Erwachsene'}
 Partner:
 ${partnerList}
@@ -2556,8 +2564,10 @@ export async function generateSingleActivity(
 
 AUFGABE: Generiere detaillierte Inhalte für EINE SPEZIFISCHE AKTIVITÄT (Aktivität ${actNum}) in Work Package ${wpIndex}: "${wpTitle}".
 
-PROJEKT-KONTEXT:
+=== PROJEKT KONTEXT ===
 Projekttitel: ${state.projectTitle || 'N/A'}
+Akronym: ${state.acronym || 'N/A'}
+Aktionstyp: ${state.configuration?.actionType}
 Sektor: ${state.idea.sector}
 Zielgruppen: ${state.idea.targetGroups?.join(', ') || 'N/A'}
 Partner:
@@ -3506,6 +3516,7 @@ export async function runCriticalEvaluator(
 
   PROJEKTKONTEXT:
   - Titel: ${state.projectTitle || 'Noch nicht definiert'}
+  - Akronym: ${state.acronym || 'Noch nicht definiert'}
   
   ${ragContext}
   
@@ -3772,10 +3783,13 @@ export function createInitialPipelineState(
     idea,
     originalConcept,
     wpConfigurations,
+    projectTitle: idea.title || originalConcept?.title,
+    acronym: idea.acronym || originalConcept?.acronym,
     configuration: {
       totalBudget: configuration?.totalBudget || 250000,
       wpCount,
       actionType,
+      duration: configuration?.duration || originalConcept?.workPackages?.[0]?.duration?.end,
     },
     currentStep: 0,
     totalSteps: dynamicSteps.length,
