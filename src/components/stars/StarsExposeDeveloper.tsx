@@ -239,6 +239,87 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
     const selectedConcept = store.conceptProposals.find(c => c.id === store.selectedConceptId);
     const title = store.projectTitle || selectedConcept?.title || 'STARS Projekt';
     const acronym = store.projectAcronym || selectedConcept?.acronym || '';
+    const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
+
+    // -----------------------------------------------------------------------
+    // Build the detailedConcept — this is the Generator's "WICHTIGSTE QUELLE"
+    // Use the full exposé if available, otherwise assemble from sections.
+    // -----------------------------------------------------------------------
+    const detailedConcept = store.fullExpose || [
+      store.challengeNarrative && `## The Challenge\n${store.challengeNarrative}`,
+      store.opportunityNarrative && `## The Opportunity\n${store.opportunityNarrative}`,
+      store.projectResponse && `## The Project Response\n${store.projectResponse}`,
+      store.goals.length > 0 && `## Project Goals\n${store.goals.map(g =>
+        `**G${g.number}: ${g.statement}**\nRationale: ${g.rationale}\nMeasurable Outcome: ${g.measurableOutcome}`
+      ).join('\n\n')}`,
+      store.starsTargetGroups.length > 0 && `## Target Groups\n${store.starsTargetGroups.map(tg =>
+        `**${tg.level}: ${tg.name}** — ${tg.description}\nNeeds: ${tg.characteristicsAndNeeds}\nRole: ${tg.roleInProject}\nReach: ${tg.estimatedReach}`
+      ).join('\n\n')}`,
+      store.methodPrinciples.length > 0 && `## Methodological Approach\n${store.methodPrinciples.map(mp =>
+        `**${mp.name}**: ${mp.description}`
+      ).join('\n\n')}`,
+    ].filter(Boolean).join('\n\n---\n\n');
+
+    // -----------------------------------------------------------------------
+    // Build originalConcept — the data structure the Generator actually reads
+    // -----------------------------------------------------------------------
+    const originalConcept = {
+      id: `stars_concept_${Date.now()}`,
+      createdAt: new Date(),
+      status: 'APPLIED' as const,
+      partnerIds: store.selectedPartners.map(sp => sp.partnerId),
+      initialIdea: store.idea,
+      sector: store.sector as any,
+      actionType: store.actionType as any,
+      conceptMode: 'stars' as const,
+
+      // Fields the Generator reads in AI prompts:
+      title,
+      acronym,
+      priority: store.priorityFocus || store.euPolicyAlignment?.[0] || '',
+      problemStatement: store.challengeNarrative || store.enhancedProblem || store.problem,
+      innovation: selectedConcept?.innovation || store.projectResponse || '',
+      expectedImpact: selectedConcept?.summary || '',
+      detailedConcept,
+      mainOutputs: selectedConcept?.mainOutputs || [],
+      consortiumFit: store.partnershipNarrative || '',
+      duration,
+
+      // Study references from analyzed sources
+      studyReferences: store.sources
+        .filter(s => s.isAnalyzed)
+        .map(s => ({
+          title: s.title,
+          url: '',
+          snippet: s.summary || s.keyFindings?.join('; ') || '',
+        })),
+
+      // STARS goals → Generator objectives
+      objectives: store.goals.map(g => ({
+        text: g.statement,
+        indicators: [g.measurableOutcome],
+        sources: [] as string[],
+        erasmusPriority: '',
+      })),
+
+      // Empty WPs — Generator creates these
+      workPackages: [],
+
+      // STARS-specific structured data for enhanced Generator prompts
+      starsData: {
+        challengeNarrative: store.challengeNarrative,
+        opportunityNarrative: store.opportunityNarrative,
+        projectResponse: store.projectResponse,
+        goals: store.goals,
+        starsTargetGroups: store.starsTargetGroups,
+        methodPrinciples: store.methodPrinciples,
+        partnershipNarrative: store.partnershipNarrative,
+        associatedPartners: store.associatedPartners,
+        euPolicyAlignment: store.euPolicyAlignment,
+        fullExpose: store.fullExpose || '',
+      },
+    };
+
     const projectData: any = {
       title,
       acronym,
@@ -246,7 +327,7 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
       actionType: store.actionType as any,
       sector: store.sector as any,
       budgetTier: store.budgetTier || (store.actionType === 'KA220' ? 250000 : 60000),
-      duration: store.duration || (store.actionType === 'KA210' ? 12 : 24),
+      duration,
       callYear: new Date().getFullYear(),
       horizontalPriorities: store.euPolicyAlignment || [],
       problemStatement: store.challengeNarrative || store.problem,
@@ -278,18 +359,8 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
       indicators: [],
       disseminationChannels: [],
       multiplierEvents: [],
-      starsData: {
-        challengeNarrative: store.challengeNarrative,
-        opportunityNarrative: store.opportunityNarrative,
-        projectResponse: store.projectResponse,
-        goals: store.goals,
-        starsTargetGroups: store.starsTargetGroups,
-        methodPrinciples: store.methodPrinciples,
-        partnershipNarrative: store.partnershipNarrative,
-        associatedPartners: store.associatedPartners,
-        euPolicyAlignment: store.euPolicyAlignment,
-        fullExpose: store.fullExpose || '',
-      },
+      originalConcept,
+      starsData: originalConcept.starsData,
       conceptDeveloperState: undefined, // Clear dev state after export
     };
 

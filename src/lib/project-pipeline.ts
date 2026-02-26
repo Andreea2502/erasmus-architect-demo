@@ -1676,6 +1676,16 @@ ${originalConcept.studyReferences?.map(s => `- ${s.title} (${s.url || 'Keine URL
 ${originalConcept.objectives && originalConcept.objectives.length > 0 ? `
 SMART-Ziele aus Konzeptentwicklung (MÜSSEN in die Antwort einfließen wenn thematisch relevant):
 ${originalConcept.objectives.map((o, i) => `- SO${i + 1}: ${o.text}${o.indicators?.length ? ` (Indikatoren: ${o.indicators.join('; ')})` : ''}${o.erasmusPriority ? ` [Priorität: ${o.erasmusPriority}]` : ''}`).join('\n')}` : ''}
+${(originalConcept as any).starsData ? `
+=== STARS EXPOSÉ DATEN (DETAILLIERTE PROJEKT-STRUKTUR) ===
+${(originalConcept as any).starsData.challengeNarrative ? `Challenge-Narrativ:\n${(originalConcept as any).starsData.challengeNarrative}\n` : ''}
+${(originalConcept as any).starsData.opportunityNarrative ? `Opportunity-Narrativ:\n${(originalConcept as any).starsData.opportunityNarrative}\n` : ''}
+${(originalConcept as any).starsData.projectResponse ? `Projekt-Antwort:\n${(originalConcept as any).starsData.projectResponse}\n` : ''}
+${(originalConcept as any).starsData.goals?.length > 0 ? `Projektziele mit Rationale:\n${(originalConcept as any).starsData.goals.map((g: any) => `- G${g.number}: ${g.statement}\n  Rationale: ${g.rationale}\n  Messbar: ${g.measurableOutcome}`).join('\n')}\n` : ''}
+${(originalConcept as any).starsData.starsTargetGroups?.length > 0 ? `Zielgruppen-Hierarchie:\n${(originalConcept as any).starsData.starsTargetGroups.map((tg: any) => `- ${tg.level}: ${tg.name} — ${tg.description} (Reichweite: ${tg.estimatedReach})`).join('\n')}\n` : ''}
+${(originalConcept as any).starsData.methodPrinciples?.length > 0 ? `Methodologische Prinzipien:\n${(originalConcept as any).starsData.methodPrinciples.map((mp: any) => `- ${mp.name}: ${mp.description}`).join('\n')}\n` : ''}
+${(originalConcept as any).starsData.partnershipNarrative ? `Partnerschafts-Narrativ:\n${(originalConcept as any).starsData.partnershipNarrative}\n` : ''}
+=== ENDE STARS DATEN ===` : ''}
 ` : ''}
 
 === ANTWORT-FORMAT & LÄNGEN-VORGABEN (KRITIKALITÄT: HOCH) ===
@@ -2016,7 +2026,8 @@ Hauptziel: ${state.idea.mainObjective}
 ${state.originalConcept ? `
 Konzept-Innovation: ${state.originalConcept.innovation}
 Problemstellung: ${state.originalConcept.problemStatement}
-${state.originalConcept.detailedConcept ? `Detailliertes Konzept (WICHTIGSTE QUELLE):\n${state.originalConcept.detailedConcept}\n` : ''}` : ''}`;
+${state.originalConcept.detailedConcept ? `Detailliertes Konzept (WICHTIGSTE QUELLE):\n${state.originalConcept.detailedConcept}\n` : ''}
+${(state.originalConcept as any).starsData?.methodPrinciples?.length > 0 ? `Methodologische Prinzipien:\n${(state.originalConcept as any).starsData.methodPrinciples.map((mp: any) => `- ${mp.name}: ${mp.description}`).join('\n')}\n` : ''}` : ''}`;
 
   // Existing text context (for improvements)
   const existingTextContext = existingValue
@@ -3065,6 +3076,12 @@ Erwarteter Impact: ${state.originalConcept.expectedImpact || 'N/A'}
 ${state.originalConcept.detailedConcept ? `\nDetailliertes Konzept (WICHTIGSTE QUELLE):\n${state.originalConcept.detailedConcept}\n` : ''}
 ${state.originalConcept.ltta ? `LTTA geplant: ${state.originalConcept.ltta.count} Events mit ${state.originalConcept.ltta.participants} Teilnehmern` : ''}
 ${state.originalConcept.multiplierEvents ? `Multiplier Events: ${state.originalConcept.multiplierEvents.count} Events` : ''}
+${(state.originalConcept as any).starsData ? `
+=== STARS EXPOSÉ — STRUKTURIERTE PROJEKT-DATEN ===
+${(state.originalConcept as any).starsData.goals?.length > 0 ? `Projektziele:\n${(state.originalConcept as any).starsData.goals.map((g: any) => `G${g.number}: ${g.statement} (Messbar: ${g.measurableOutcome})`).join('\n')}\n` : ''}
+${(state.originalConcept as any).starsData.starsTargetGroups?.length > 0 ? `Zielgruppen:\n${(state.originalConcept as any).starsData.starsTargetGroups.map((tg: any) => `${tg.level}: ${tg.name} — Reichweite: ${tg.estimatedReach}`).join('\n')}\n` : ''}
+${(state.originalConcept as any).starsData.methodPrinciples?.length > 0 ? `Methodologische Prinzipien:\n${(state.originalConcept as any).starsData.methodPrinciples.map((mp: any) => `- ${mp.name}: ${mp.description}`).join('\n')}\n` : ''}
+=== ENDE STARS DATEN ===` : ''}
 `
     : '';
 
