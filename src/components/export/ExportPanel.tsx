@@ -24,6 +24,10 @@ import {
   Shield,
   FileUp,
   Printer,
+  ClipboardCheck,
+  Languages,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 type ExportFormat = "json" | "word" | "summary" | "pdf";
@@ -96,6 +100,12 @@ export function ExportPanel() {
   const [showBackupReminder, setShowBackupReminder] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [importMessage, setImportMessage] = useState('');
+  const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [showMissingDetails, setShowMissingDetails] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [translateProgress, setTranslateProgress] = useState({ current: 0, total: 0 });
+  const [translatedAnswers, setTranslatedAnswers] = useState<Record<string, string>>({});
+  const [showTranslated, setShowTranslated] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const project = projects.find((p) => p.id === selectedProject);
@@ -170,7 +180,7 @@ export function ExportPanel() {
     return partners.find((p) => p.id === partnerId);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!project) return;
 
     // For PDF: Open print dialog directly instead of showing preview
@@ -203,24 +213,157 @@ export function ExportPanel() {
     } else if (exportFormat === "summary") {
       content = generateSummary(project);
     } else if (exportFormat === "word") {
-      // For Word: Download directly as .doc file
-      const wordContent = generateWordContent(project);
-      const blob = new Blob([wordContent], { type: "application/msword" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${project.acronym || "project"}_application.doc`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Real DOCX export via API
+      const answers = project.generatorState?.answers || {};
+      const actionType = project.actionType || 'KA220';
+      const wpCount = project.generatorState?.configuration?.wpCount || project.workPackages?.length || 5;
+      const structure = getOfficialPipelineStructure(actionType as 'KA220' | 'KA210', wpCount);
 
-      // Show confirmation message in preview
-      setExportedContent(`Word-Dokument wurde heruntergeladen: ${project.acronym || "project"}_application.doc\n\nÖffne die Datei mit Microsoft Word oder LibreOffice Writer.\n\nDas Dokument enthält alle generierten Inhalte mit Formatierung.`);
+      const getVal = (key: string): string => {
+        if (showTranslated && translatedAnswers[key]) return translatedAnswers[key];
+        const ans = answers[key];
+        if (!ans) return '';
+        if (typeof ans === 'string') return ans;
+        if (typeof ans === 'object' && ans.value) return ans.value;
+        return '';
+      };
+
+      // Build sections from pipeline structure
+      const sections: { chapterTitle: string; chapterId: number; questionText: string; fullQuestion: string; answerText: string; partnerName?: string; charLimit?: number }[] = [];
+
+      for (const chapter of structure) {
+        if (chapter.id === 1 || chapter.id === 8) continue;
+        for (const section of chapter.sections) {
+          const isPartnerSection = chapter.id === 2;
+          for (const q of section.questions) {
+            if (q.type === 'info' || q.type === 'select' || q.type === 'multiselect' || q.type === 'number') continue;
+            if (isPartnerSection) {
+              for (const member of project.consortium) {
+                const val = getVal(`${q.id}_${member.partnerId}`);
+                if (!val) continue;
+                const partner = getPartner(member.partnerId);
+                sections.push({
+                  chapterTitle: chapter.title,
+                  chapterId: chapter.id,
+                  questionText: q.text,
+                  fullQuestion: q.fullQuestion,
+                  answerText: val,
+                  partnerName: partner ? `${partner.organizationName} (${COUNTRY_NAMES[partner.country] || partner.country})` : undefined,
+                  charLimit: q.charLimit,
+                });
+              }
+            } else {
+              const val = getVal(q.id);
+              if (!val) continue;
+              sections.push({
+                chapterTitle: chapter.title,
+                chapterId: chapter.id,
+                questionText: q.text,
+                fullQuestion: q.fullQuestion,
+                answerText: val,
+                charLimit: q.charLimit,
+              });
+            }
+          }
+        }
+      }
+
+      // Build consortium data
+      const consortiumData = project.consortium.map(member => {
+        const partner = getPartner(member.partnerId);
+        return {
+          name: partner?.organizationName || 'Unknown',
+          country: COUNTRY_NAMES[partner?.country || ''] || partner?.country || '',
+          type: partner?.organizationType ? ORGANIZATION_TYPE_LABELS[partner.organizationType] : '',
+          role: member.role,
+        };
+      });
+
+      try {
+        const res = await fetch('/api/export-docx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: project.title,
+            acronym: project.acronym,
+            actionType: ACTION_TYPE_LABELS[project.actionType],
+            sector: SECTOR_LABELS[project.sector],
+            budget: project.budgetTier,
+            duration: project.duration,
+            consortium: consortiumData,
+            sections,
+          }),
+        });
+
+        if (!res.ok) throw new Error('DOCX generation failed');
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project.acronym || 'project'}_application.docx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        setExportedContent(`Word-Dokument (.docx) wurde heruntergeladen: ${project.acronym || "project"}_application.docx\n\nÖffne die Datei mit Microsoft Word oder LibreOffice Writer.\n\nDas Dokument enthält ${sections.length} Abschnitte mit allen generierten Inhalten.${showTranslated ? '\n\n🇬🇧 English Translation included.' : ''}`);
+      } catch (err) {
+        console.error('DOCX export error:', err);
+        setExportedContent(`Fehler beim DOCX-Export: ${(err as Error).message}\n\nVersuche stattdessen den PDF-Export.`);
+      }
       return;
     }
 
     setExportedContent(content);
+  };
+
+  // Translation handler
+  const handleTranslate = async () => {
+    if (!project || translating) return;
+    const answers = project.generatorState?.answers || {};
+    const keys = Object.keys(answers).filter(k => {
+      const v = answers[k];
+      return v && ((typeof v === 'string' && v.trim()) || (typeof v === 'object' && v.value?.trim()));
+    });
+
+    if (keys.length === 0) return;
+
+    setTranslating(true);
+    setTranslateProgress({ current: 0, total: keys.length });
+    const translated: Record<string, string> = {};
+
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const ans = answers[key];
+      const text = typeof ans === 'string' ? ans : ans?.value || '';
+      if (!text.trim()) continue;
+
+      try {
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, targetLanguage: 'en', context: project.actionType }),
+        });
+        const data = await res.json();
+        if (data.translatedText) {
+          translated[key] = data.translatedText;
+        }
+      } catch (err) {
+        console.error(`Translation failed for ${key}:`, err);
+      }
+      setTranslateProgress({ current: i + 1, total: keys.length });
+    }
+
+    setTranslatedAnswers(translated);
+    setShowTranslated(true);
+    setTranslating(false);
+    // Re-trigger export to refresh preview
+    if (exportFormat === 'summary') {
+      setExportedContent(generateSummary(project));
+    } else {
+      setExportedContent('translated');
+    }
   };
 
   const generateSummary = (proj: typeof project) => {
@@ -228,184 +371,101 @@ export function ExportPanel() {
 
     const coordinator = proj.consortium.find((m) => m.role === "COORDINATOR");
     const coordinatorPartner = coordinator ? getPartner(coordinator.partnerId) : null;
+    const answers = proj.generatorState?.answers || {};
+
+    const getAnswerVal = (key: string): string => {
+      const ans = answers[key];
+      if (!ans) return '';
+      if (typeof ans === 'string') return ans;
+      if (typeof ans === 'object' && ans.value) return ans.value;
+      return '';
+    };
 
     const lines = [
       `PROJECT SUMMARY`,
-      `===============`,
+      `═══════════════`,
       ``,
-      `BASIC INFORMATION`,
-      `-----------------`,
       `Title: ${proj.title || "Not specified"}`,
       `Acronym: ${proj.acronym || "Not specified"}`,
       `Action Type: ${ACTION_TYPE_LABELS[proj.actionType]}`,
       `Sector: ${SECTOR_LABELS[proj.sector]}`,
       `Budget: €${proj.budgetTier.toLocaleString()}`,
       `Duration: ${proj.duration} months`,
-      `Call Year: ${proj.callYear}`,
-      ``,
-      `CONSORTIUM`,
-      `----------`,
-      `Number of Partners: ${proj.consortium.length}`,
       `Coordinator: ${coordinatorPartner ? coordinatorPartner.organizationName : "Not assigned"}`,
       `Countries: ${[...new Set(proj.consortium.map((m) => getPartner(m.partnerId)?.country).filter(Boolean))].map((c) => COUNTRY_NAMES[c!] || c).join(", ")}`,
       ``,
-      `Partners:`,
+      `CONSORTIUM`,
+      `──────────`,
     ];
 
     proj.consortium.forEach((member, idx) => {
       const partner = getPartner(member.partnerId);
       if (partner) {
         lines.push(
-          `  ${idx + 1}. ${partner.organizationName} (${COUNTRY_NAMES[partner.country] || partner.country}) - ${member.role}`
+          `  ${idx + 1}. ${partner.organizationName} (${COUNTRY_NAMES[partner.country] || partner.country}, ${ORGANIZATION_TYPE_LABELS[partner.organizationType]}) – ${member.role}`
         );
       }
     });
 
-    if (proj.problemStatement) {
-      lines.push(``);
-      lines.push(`PROBLEM STATEMENT`);
-      lines.push(`-----------------`);
-      lines.push(proj.problemStatement);
-    }
+    // Use pipeline structure for correct ordering
+    const actionType = proj.actionType || 'KA220';
+    const wpCount = proj.generatorState?.configuration?.wpCount || proj.workPackages?.length || 5;
+    const structure = getOfficialPipelineStructure(actionType as 'KA220' | 'KA210', wpCount);
 
-    if (proj.objectives.length > 0) {
-      lines.push(``);
-      lines.push(`OBJECTIVES`);
-      lines.push(`----------`);
-      proj.objectives.forEach((obj) => {
-        lines.push(`${obj.code} (${obj.type}): ${obj.description}`);
-      });
-    }
+    let totalExported = 0;
 
-    if (proj.workPackages.length > 0) {
-      lines.push(``);
-      lines.push(`WORK PACKAGES`);
-      lines.push(`-------------`);
-      proj.workPackages.forEach((wp) => {
-        lines.push(`WP${wp.number}: ${wp.title} (M${wp.startMonth}-M${wp.endMonth})`);
-        if (wp.objectives) {
-          lines.push(`  Objectives: ${wp.objectives}`);
+    for (const chapter of structure) {
+      if (chapter.id === 1 || chapter.id === 8) continue;
+
+      let chapterHasContent = false;
+
+      for (const section of chapter.sections) {
+        const isPartnerSection = chapter.id === 2;
+
+        for (const q of section.questions) {
+          if (q.type === 'info' || q.type === 'select' || q.type === 'multiselect' || q.type === 'number') continue;
+
+          if (isPartnerSection) {
+            for (const member of proj.consortium) {
+              const val = getAnswerVal(`${q.id}_${member.partnerId}`);
+              if (!val) continue;
+              if (!chapterHasContent) {
+                lines.push(``);
+                lines.push(`CHAPTER ${chapter.id}: ${chapter.title.toUpperCase()}`);
+                lines.push(`${'─'.repeat(40)}`);
+                chapterHasContent = true;
+              }
+              const partner = getPartner(member.partnerId);
+              lines.push(``);
+              lines.push(`▸ ${q.text} – ${partner?.organizationName || '?'}`);
+              lines.push(`  ${q.fullQuestion}`);
+              lines.push(``);
+              lines.push(val);
+              totalExported++;
+            }
+          } else {
+            const val = getAnswerVal(q.id);
+            if (!val) continue;
+            if (!chapterHasContent) {
+              lines.push(``);
+              lines.push(`CHAPTER ${chapter.id}: ${chapter.title.toUpperCase()}`);
+              lines.push(`${'─'.repeat(40)}`);
+              chapterHasContent = true;
+            }
+            lines.push(``);
+            lines.push(`▸ ${q.text}`);
+            lines.push(`  ${q.fullQuestion}`);
+            lines.push(``);
+            lines.push(val);
+            totalExported++;
+          }
         }
-        if (wp.activities.length > 0) {
-          lines.push(`  Activities: ${wp.activities.length}`);
-        }
-        if (wp.deliverables.length > 0) {
-          lines.push(`  Deliverables: ${wp.deliverables.length}`);
-        }
-      });
+      }
     }
 
-    if (proj.results.length > 0) {
-      lines.push(``);
-      lines.push(`PROJECT RESULTS`);
-      lines.push(`---------------`);
-      proj.results.forEach((result) => {
-        lines.push(`${result.code}: ${result.title} (${result.type})`);
-        if (result.description) {
-          lines.push(`  ${result.description.substring(0, 200)}${result.description.length > 200 ? "..." : ""}`);
-        }
-        lines.push(`  Languages: ${result.languages?.join(", ") || 'Not specified'}`);
-      });
-    }
-
-    if (proj.horizontalPriorities.length > 0) {
-      lines.push(``);
-      lines.push(`HORIZONTAL PRIORITIES`);
-      lines.push(`---------------------`);
-      proj.horizontalPriorities.forEach((p) => {
-        lines.push(`• ${p}`);
-      });
-    }
-
-    // =========================================================================
-    // CRITICAL: Export all generated Pipeline answers (the 30k+ words!)
-    // =========================================================================
-    if (proj.generatorState?.answers && Object.keys(proj.generatorState.answers).length > 0) {
-      lines.push(``);
-      lines.push(`===========================================`);
-      lines.push(`GENERATED APPLICATION CONTENT (FULL TEXT)`);
-      lines.push(`===========================================`);
-      lines.push(``);
-
-      // Group answers by chapter/section for better readability
-      const answers = proj.generatorState.answers;
-      const answerKeys = Object.keys(answers).sort();
-
-      // Define question labels for better readability
-      const questionLabels: Record<string, string> = {
-        'projectTitle': '1.1 Project Title',
-        'acronym': '1.2 Acronym',
-        'projectDuration': '1.3 Duration',
-        'projectStart': '1.4 Start Date',
-        'org_presentation': '2.1 Organisation Presentation',
-        'org_experience': '2.2 Organisation Experience',
-        'org_past_participation': '2.3 Past Participation',
-        'address_priorities': '3.1 Addressing Priorities',
-        'needs_address': '3.2 Needs Analysis',
-        'target_groups': '3.3 Target Groups',
-        'objectives_results': '3.4 Objectives and Results',
-        'eu_added_value': '3.5 EU Added Value',
-        'formation': '4.1 Partnership Formation',
-        'partner_selection': '4.2 Partner Selection',
-        'task_allocation': '4.3 Task Allocation',
-        'coordination': '4.4 Coordination Mechanisms',
-        'wp1_monitoring': '6.1 Monitoring & Quality',
-        'wp1_personnel': '6.2 Personnel & Timing',
-        'wp1_budget': '6.3 Budget Management',
-        'wp1_risks': '6.4 Risk Management',
-        'wp1_inclusion': '6.5 Inclusion',
-        'wp1_digital': '6.6 Digitalisation',
-        'wp1_green': '6.7 Green Practices',
-        'wp1_participation': '6.8 Participation',
-        'evaluation': '5.1 Evaluation Methods',
-        'dissemination': '5.2 Dissemination Strategy',
-        'sustainability': '5.3 Sustainability',
-        'summary_objectives': '7.1 Summary - Objectives',
-        'summary_activities': '7.2 Summary - Activities',
-        'summary_results': '7.3 Summary - Results',
-      };
-
-      let currentChapter = '';
-
-      answerKeys.forEach((key) => {
-        const answer = answers[key];
-        if (!answer?.value || answer.value.trim() === '') return;
-
-        // Determine chapter from key
-        let chapter = 'Other';
-        if (key.startsWith('org_')) chapter = 'Chapter 2: Participating Organisations';
-        else if (key === 'projectTitle' || key === 'acronym' || key.startsWith('project')) chapter = 'Chapter 1: Context';
-        else if (key.startsWith('address_') || key.startsWith('needs_') || key.startsWith('target_') || key.startsWith('objectives_') || key === 'eu_added_value') chapter = 'Chapter 3: Relevance';
-        else if (key.startsWith('formation') || key.startsWith('partner_') || key.startsWith('task_') || key.startsWith('coordination')) chapter = 'Chapter 4: Partnership';
-        else if (key.startsWith('evaluation') || key.startsWith('dissemination') || key.startsWith('sustainability')) chapter = 'Chapter 5: Impact';
-        else if (key.startsWith('wp')) chapter = 'Chapter 6: Work Packages';
-        else if (key.startsWith('summary_')) chapter = 'Chapter 7: Summary';
-
-        // Add chapter header if new chapter
-        if (chapter !== currentChapter) {
-          lines.push(``);
-          lines.push(`----- ${chapter} -----`);
-          currentChapter = chapter;
-        }
-
-        // Get readable label or use key
-        const baseKey = key.split('_').slice(0, -1).join('_') || key; // Remove partner ID suffix if present
-        const label = questionLabels[baseKey] || questionLabels[key] || key;
-
-        // Check if it's a partner-specific answer
-        const partnerMatch = key.match(/_([a-f0-9-]+)$/);
-        const partnerSuffix = partnerMatch ? ` (Partner: ${partnerMatch[1].substring(0, 8)}...)` : '';
-
-        lines.push(``);
-        lines.push(`### ${label}${partnerSuffix} ###`);
-        lines.push(``);
-        lines.push(answer.value);
-        lines.push(``);
-      });
-
-      lines.push(``);
-      lines.push(`Total answers exported: ${answerKeys.filter(k => answers[k]?.value).length}`);
-    }
+    lines.push(``);
+    lines.push(`═══════════════════════════════════════`);
+    lines.push(`Total exported sections: ${totalExported}`);
 
     lines.push(``);
     lines.push(`---`);
@@ -852,7 +912,7 @@ export function ExportPanel() {
                 {
                   id: "word" as ExportFormat,
                   label: "Word-Dokument",
-                  description: ".doc Datei für Microsoft Word",
+                  description: "Echtes .docx für Microsoft Word",
                   icon: FileText,
                 },
                 {
@@ -895,6 +955,51 @@ export function ExportPanel() {
               className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-[#003399] text-white rounded-lg hover:bg-[#002266] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Generate Export
+            </button>
+          </div>
+
+          {/* Translation */}
+          <div className="bg-white rounded-xl border p-4">
+            <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Languages size={18} />
+              Translation
+            </h2>
+            <p className="text-xs text-gray-500 mb-3">
+              Übersetzt alle generierten Texte ins Englische (via KI).
+            </p>
+            {Object.keys(translatedAnswers).length > 0 && (
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  onClick={() => setShowTranslated(false)}
+                  className={`flex-1 py-1.5 text-xs rounded-lg border transition-colors ${!showTranslated ? 'bg-[#003399] text-white border-[#003399]' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    }`}
+                >
+                  Original
+                </button>
+                <button
+                  onClick={() => setShowTranslated(true)}
+                  className={`flex-1 py-1.5 text-xs rounded-lg border transition-colors ${showTranslated ? 'bg-[#003399] text-white border-[#003399]' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    }`}
+                >
+                  🇬🇧 English
+                </button>
+              </div>
+            )}
+            <button
+              onClick={handleTranslate}
+              disabled={!selectedProject || translating}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {translating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Translating... {translateProgress.current}/{translateProgress.total}
+                </>
+              ) : Object.keys(translatedAnswers).length > 0 ? (
+                <><CheckCircle size={16} /> Erneut übersetzen</>
+              ) : (
+                <><Languages size={16} /> Ins Englische übersetzen</>
+              )}
             </button>
           </div>
         </div>
@@ -946,15 +1051,206 @@ export function ExportPanel() {
                   <div className="text-center">
                     <FileOutput size={48} className="mx-auto text-gray-300 mb-4" />
                     <p className="text-gray-500">
-                      Click "Generate Export" to preview
+                      Click &quot;Generate Export&quot; to preview
                     </p>
                   </div>
                 </div>
-              ) : (
+              ) : exportFormat === 'json' ? (
                 <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700 bg-gray-50 p-4 rounded-lg overflow-auto max-h-[600px]">
                   {exportedContent}
                 </pre>
-              )}
+              ) : (() => {
+                // Structured preview using pipeline structure
+                const proj = project;
+                if (!proj) return null;
+                const answers = proj.generatorState?.answers || {};
+                const actionType = proj.actionType || 'KA220';
+                const wpCount = proj.generatorState?.configuration?.wpCount || proj.workPackages?.length || 5;
+                const structure = getOfficialPipelineStructure(actionType as 'KA220' | 'KA210', wpCount);
+
+                const getAnswerVal = (key: string): string => {
+                  // Use translated version if available and toggle is on
+                  if (showTranslated && translatedAnswers[key]) {
+                    return translatedAnswers[key];
+                  }
+                  const ans = answers[key];
+                  if (!ans) return '';
+                  if (typeof ans === 'string') return ans;
+                  if (typeof ans === 'object' && ans.value) return ans.value;
+                  return '';
+                };
+
+                // Count missing answers
+                let totalQuestions = 0;
+                let answeredQuestions = 0;
+                const missingQuestions: { chapter: string; question: string }[] = [];
+
+                for (const chapter of structure) {
+                  if (chapter.id === 1 || chapter.id === 8) continue;
+                  for (const section of chapter.sections) {
+                    const isPartnerSection = chapter.id === 2;
+                    for (const q of section.questions) {
+                      if (q.type === 'info' || q.type === 'select' || q.type === 'multiselect' || q.type === 'number') continue;
+                      if (isPartnerSection) {
+                        for (const member of proj.consortium) {
+                          totalQuestions++;
+                          const val = getAnswerVal(`${q.id}_${member.partnerId}`);
+                          if (val) answeredQuestions++;
+                          else {
+                            const partner = getPartner(member.partnerId);
+                            missingQuestions.push({ chapter: `Ch.${chapter.id}`, question: `${q.text} (${partner?.organizationName || '?'})` });
+                          }
+                        }
+                      } else {
+                        totalQuestions++;
+                        const val = getAnswerVal(q.id);
+                        if (val) answeredQuestions++;
+                        else missingQuestions.push({ chapter: `Ch.${chapter.id}`, question: q.text });
+                      }
+                    }
+                  }
+                }
+
+                const copyToClipboard = (text: string, sectionId: string) => {
+                  navigator.clipboard.writeText(text);
+                  setCopiedSection(sectionId);
+                  setTimeout(() => setCopiedSection(null), 2000);
+                };
+
+                const charBadge = (text: string, limit?: number) => {
+                  if (!limit) return null;
+                  const len = text.length;
+                  const pct = len / limit;
+                  let color = 'bg-green-100 text-green-700';
+                  if (pct > 1) color = 'bg-red-100 text-red-700';
+                  else if (pct > 0.9) color = 'bg-yellow-100 text-yellow-700';
+                  return (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${color}`}>
+                      {len.toLocaleString()} / {limit.toLocaleString()}
+                    </span>
+                  );
+                };
+
+                return (
+                  <div className="space-y-4 max-h-[700px] overflow-auto">
+                    {/* Missing answers warning */}
+                    {missingQuestions.length > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <button
+                          onClick={() => setShowMissingDetails(!showMissingDetails)}
+                          className="w-full flex items-center justify-between text-left"
+                        >
+                          <div className="flex items-center gap-2">
+                            <AlertCircle size={16} className="text-amber-600" />
+                            <span className="text-sm font-medium text-amber-800">
+                              ⚠ {missingQuestions.length} von {totalQuestions} Fragen noch nicht beantwortet
+                            </span>
+                          </div>
+                          {showMissingDetails ? <ChevronUp size={16} className="text-amber-600" /> : <ChevronDown size={16} className="text-amber-600" />}
+                        </button>
+                        {showMissingDetails && (
+                          <ul className="mt-2 space-y-1 text-xs text-amber-700 border-t border-amber-200 pt-2">
+                            {missingQuestions.map((mq, i) => (
+                              <li key={i} className="flex gap-2">
+                                <span className="text-amber-500 font-mono">{mq.chapter}</span>
+                                <span>{mq.question}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Completeness bar */}
+                    <div className="flex items-center gap-3 text-sm text-gray-600">
+                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div
+                          className="h-2 rounded-full transition-all bg-green-500"
+                          style={{ width: `${totalQuestions > 0 ? (answeredQuestions / totalQuestions * 100) : 0}%` }}
+                        />
+                      </div>
+                      <span className="font-medium">{answeredQuestions}/{totalQuestions} beantwortet</span>
+                    </div>
+
+                    {/* Chapters */}
+                    {structure.map(chapter => {
+                      if (chapter.id === 1 || chapter.id === 8) return null;
+
+                      const chapterAnswers: { questionText: string; fullQuestion: string; answerText: string; answerId: string; charLimit?: number }[] = [];
+
+                      for (const section of chapter.sections) {
+                        const isPartnerSection = chapter.id === 2;
+                        for (const q of section.questions) {
+                          if (q.type === 'info' || q.type === 'select' || q.type === 'multiselect' || q.type === 'number') continue;
+                          if (isPartnerSection) {
+                            for (const member of proj.consortium) {
+                              const val = getAnswerVal(`${q.id}_${member.partnerId}`);
+                              if (!val) continue;
+                              const partner = getPartner(member.partnerId);
+                              chapterAnswers.push({
+                                questionText: `${q.text} – ${partner?.organizationName || member.partnerId}`,
+                                fullQuestion: q.fullQuestion,
+                                answerText: val,
+                                answerId: `${q.id}_${member.partnerId}`,
+                                charLimit: q.charLimit
+                              });
+                            }
+                          } else {
+                            const val = getAnswerVal(q.id);
+                            if (!val) continue;
+                            chapterAnswers.push({
+                              questionText: q.text,
+                              fullQuestion: q.fullQuestion,
+                              answerText: val,
+                              answerId: q.id,
+                              charLimit: q.charLimit
+                            });
+                          }
+                        }
+                      }
+
+                      if (chapterAnswers.length === 0) return null;
+
+                      return (
+                        <div key={chapter.id} className="border rounded-lg overflow-hidden">
+                          <div className="bg-[#003399] text-white px-4 py-2 font-semibold text-sm">
+                            Chapter {chapter.id}: {chapter.title}
+                          </div>
+                          <div className="divide-y">
+                            {chapterAnswers.map(({ questionText, fullQuestion, answerText, answerId, charLimit }) => (
+                              <div key={answerId} className="p-3">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <div className="flex-1">
+                                    <div className="text-xs font-semibold text-[#003399]">{fullQuestion}</div>
+                                    <div className="text-[10px] text-gray-400 italic">{questionText}</div>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {charBadge(answerText, charLimit)}
+                                    <button
+                                      onClick={() => copyToClipboard(answerText, answerId)}
+                                      className="flex items-center gap-1 px-2 py-1 text-xs border rounded hover:bg-gray-50 transition-colors"
+                                      title="In Zwischenablage kopieren"
+                                    >
+                                      {copiedSection === answerId ? (
+                                        <><ClipboardCheck size={12} className="text-green-600" /><span className="text-green-600">Kopiert!</span></>
+                                      ) : (
+                                        <><Copy size={12} className="text-gray-400" /><span className="text-gray-500">Copy</span></>
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-sm text-gray-700 bg-gray-50 rounded p-2 whitespace-pre-wrap leading-relaxed max-h-40 overflow-auto">
+                                  {answerText}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
