@@ -13,6 +13,7 @@ import {
     getStarsMethodologyPrompt,
     getAssembleStarsExposePrompt,
     buildPartnershipFactsBlock,
+    buildSelectedConceptBlock,
 } from '@/lib/stars-prompts';
 import { ResearchSource } from '@/types/concept';
 import { StarsGoal, StarsTargetGroup, StarsMethodPrinciple, StarsConceptProposal } from '@/types/stars-concept';
@@ -91,6 +92,20 @@ export function useStarsGeneration() {
         if (partnerDetails.length === 0) return '';
 
         return buildPartnershipFactsBlock(partnerDetails, budget, duration, store.actionType);
+    };
+
+    // ========================================================================
+    // SHARED: Get selected concept and build concept context block
+    // ========================================================================
+
+    const getSelectedConcept = () => {
+        if (!store.selectedConceptId) return null;
+        return store.conceptProposals.find(c => c.id === store.selectedConceptId) || null;
+    };
+
+    const getConceptContext = (): string => {
+        const concept = getSelectedConcept();
+        return buildSelectedConceptBlock(concept);
     };
 
     // ========================================================================
@@ -372,7 +387,9 @@ Antworte im JSON-Format:
 
             const ideaText = store.enhancedIdea || store.idea;
             const partnershipFacts = getPartnershipFacts();
-            const prompt = getPartnershipNarrativePrompt(ideaText, partnersDetail, store.actionType, store.sector, partnershipFacts);
+            const sourceContext = buildSourceContext(store.sources);
+            const conceptContext = getConceptContext();
+            const prompt = getPartnershipNarrativePrompt(ideaText, partnersDetail, store.actionType, store.sector, partnershipFacts, sourceContext, conceptContext);
 
             const response = await generateContentAction(prompt, NARRATIVE_SYSTEM, 0.7, 45000);
             store.updateState({ partnershipNarrative: response.trim(), isGeneratingPartnershipNarrative: false });
@@ -398,6 +415,7 @@ Antworte im JSON-Format:
             const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
             const partnershipFacts = getPartnershipFacts();
 
+            const conceptContext = getConceptContext();
             const prompt = getChallengeNarrativePrompt(
                 problemText,
                 store.targetGroup,
@@ -405,7 +423,8 @@ Antworte im JSON-Format:
                 sourceContext,
                 store.actionType,
                 duration,
-                partnershipFacts
+                partnershipFacts,
+                conceptContext
             );
 
             const response = await generateContentAction(prompt, NARRATIVE_SYSTEM, 0.7, 60000);
@@ -437,12 +456,14 @@ Antworte im JSON-Format:
             const ideaText = store.enhancedIdea || store.idea;
             const partnershipFacts = getPartnershipFacts();
 
+            const conceptContext = getConceptContext();
             const prompt = getOpportunityNarrativePrompt(
                 store.challengeNarrative,
                 ideaText,
                 sourceContext,
                 store.sector,
-                partnershipFacts
+                partnershipFacts,
+                conceptContext
             );
 
             const response = await generateContentAction(prompt, NARRATIVE_SYSTEM, 0.7, 60000);
@@ -471,10 +492,12 @@ Antworte im JSON-Format:
 
         try {
             const ideaText = store.enhancedIdea || store.idea;
-            // Use projectResponse field from store for innovation -- or derive from idea
-            const innovation = store.additionalInstructions || ideaText;
+            const selectedConcept = getSelectedConcept();
+            // Use innovation from selected concept — this is the core differentiator
+            const innovation = selectedConcept?.innovation || ideaText;
             const partnershipFacts = getPartnershipFacts();
             const sourceContext = buildSourceContext(store.sources);
+            const conceptContext = getConceptContext();
 
             const prompt = getProjectResponsePrompt(
                 store.challengeNarrative,
@@ -482,7 +505,8 @@ Antworte im JSON-Format:
                 ideaText,
                 innovation,
                 partnershipFacts,
-                sourceContext
+                sourceContext,
+                conceptContext
             );
 
             const response = await generateContentAction(prompt, NARRATIVE_SYSTEM, 0.7, 60000);
@@ -515,13 +539,15 @@ Antworte im JSON-Format:
             const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
             const partnershipFacts = getPartnershipFacts();
 
+            const conceptContext = getConceptContext();
             const prompt = getStarsGoalsPrompt(
                 store.challengeNarrative,
                 ideaText,
                 sourceContext,
                 duration,
                 store.actionType,
-                partnershipFacts
+                partnershipFacts,
+                conceptContext
             );
 
             const response = await generateJsonContentAction(prompt, JSON_SYSTEM, 0.5);
@@ -559,13 +585,15 @@ Antworte im JSON-Format:
             const partnershipFacts = getPartnershipFacts();
             const sourceContext = buildSourceContext(store.sources);
 
+            const conceptContext = getConceptContext();
             const prompt = getStarsTargetGroupsPrompt(
                 store.targetGroup,
                 ideaText,
                 store.sector,
                 store.challengeNarrative,
                 partnershipFacts,
-                sourceContext
+                sourceContext,
+                conceptContext
             );
 
             const response = await generateJsonContentAction(prompt, JSON_SYSTEM, 0.5);
@@ -605,9 +633,12 @@ Antworte im JSON-Format:
             const goalsText = store.goals
                 .map(g => `G${g.number}: ${g.statement}`)
                 .join('\n');
-            const innovation = store.additionalInstructions || ideaText;
+            const selectedConcept = getSelectedConcept();
+            // Use innovation from selected concept — not additionalInstructions
+            const innovation = selectedConcept?.innovation || ideaText;
             const partnershipFacts = getPartnershipFacts();
             const sourceContext = buildSourceContext(store.sources);
+            const conceptContext = getConceptContext();
 
             const prompt = getStarsMethodologyPrompt(
                 ideaText,
@@ -615,7 +646,8 @@ Antworte im JSON-Format:
                 innovation,
                 store.sector,
                 partnershipFacts,
-                sourceContext
+                sourceContext,
+                conceptContext
             );
 
             const response = await generateJsonContentAction(prompt, JSON_SYSTEM, 0.5);

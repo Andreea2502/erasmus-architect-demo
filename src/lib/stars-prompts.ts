@@ -184,6 +184,56 @@ ABSOLUTE ANTI-HALLUCINATION RULES (violation = immediate disqualification)
 }
 
 // ============================================================================
+// SELECTED CONCEPT CONTEXT BLOCK (injected into Step 3-4 prompts)
+// ============================================================================
+
+/**
+ * Builds a binding context block from the user-selected concept proposal.
+ * Ensures all downstream generation (Challenge → Opportunity → Response → Goals → etc.)
+ * stays aligned with the chosen concept direction.
+ */
+export function buildSelectedConceptBlock(concept: {
+  title: string;
+  acronym: string;
+  summary: string;
+  approach: string;
+  innovation: string;
+  mainOutputs: string[];
+} | null): string {
+  if (!concept) return '';
+
+  return `
+═══════════════════════════════════════════════════════════════════
+SELECTED CONCEPT DIRECTION — ALL CONTENT MUST ALIGN WITH THIS
+═══════════════════════════════════════════════════════════════════
+
+PROJECT: ${concept.acronym} — ${concept.title}
+
+STRATEGIC APPROACH:
+${concept.approach}
+
+INNOVATION / UNIQUE ELEMENT:
+${concept.innovation}
+
+SUMMARY:
+${concept.summary}
+
+MAIN PROJECT OUTPUTS:
+${concept.mainOutputs.map((o, i) => `  ${i + 1}. ${o}`).join('\n')}
+
+═══════════════════════════════════════════════════════════════════
+CONCEPT ALIGNMENT RULES:
+- ALL content you generate MUST serve this specific concept direction.
+- The challenge narrative must frame the problem so it naturally calls for THIS approach.
+- The opportunity must point toward THIS type of intervention.
+- Goals, target groups, and methodology must align with THIS concept's outputs and strategy.
+- Do NOT drift into a generic version of the project idea. Stay focused on the selected concept.
+- When describing what the project DOES, reference the main outputs listed above.
+═══════════════════════════════════════════════════════════════════
+`.trim();
+}
+
+// ============================================================================
 // 0. STARS CONCEPT PROPOSALS PROMPT (3 alternatives)
 // ============================================================================
 
@@ -308,11 +358,18 @@ export function getPartnershipNarrativePrompt(
   partnersDetail: string,
   actionType: string,
   sector: string,
-  partnershipFacts?: string
+  partnershipFacts?: string,
+  sourceContext?: string,
+  conceptContext?: string
 ): string {
   return `You are an expert Erasmus+ proposal writer specializing in ${sector} projects.
 
 ${partnershipFacts || ''}
+
+${conceptContext || ''}
+
+RESEARCH EVIDENCE AND SOURCES:
+${sourceContext || '(no research sources uploaded yet)'}
 
 PROJECT IDEA:
 "${projectIdea}"
@@ -353,11 +410,14 @@ export function getChallengeNarrativePrompt(
   sourceContext: string,
   actionType: string,
   duration: number,
-  partnershipFacts?: string
+  partnershipFacts?: string,
+  conceptContext?: string
 ): string {
   return `You are an expert Erasmus+ proposal writer crafting Section 3.1 "The Challenge" for a ${actionType} project in the ${sector} sector.
 
 ${partnershipFacts || ''}
+
+${conceptContext || ''}
 
 THE PROBLEM TO ADDRESS:
 "${problem}"
@@ -412,11 +472,14 @@ export function getOpportunityNarrativePrompt(
   projectIdea: string,
   sourceContext: string,
   sector: string,
-  partnershipFacts?: string
+  partnershipFacts?: string,
+  conceptContext?: string
 ): string {
   return `You are an expert Erasmus+ proposal writer crafting Section 3.2 "The Opportunity" for a project in the ${sector} sector.
 
 ${partnershipFacts || ''}
+
+${conceptContext || ''}
 
 THE CHALLENGE NARRATIVE (Section 3.1, already written):
 ${challengeText}
@@ -473,11 +536,14 @@ export function getProjectResponsePrompt(
   projectIdea: string,
   innovation: string,
   partnershipFacts?: string,
-  sourceContext?: string
+  sourceContext?: string,
+  conceptContext?: string
 ): string {
   return `You are an expert Erasmus+ proposal writer crafting Section 3.3 "The Project Response."
 
 ${partnershipFacts || ''}
+
+${conceptContext || ''}
 
 THE CHALLENGE (Section 3.1):
 ${challengeText}
@@ -540,7 +606,8 @@ export function getStarsGoalsPrompt(
   sourceContext: string,
   duration: number,
   actionType: string,
-  partnershipFacts?: string
+  partnershipFacts?: string,
+  conceptContext?: string
 ): string {
   const isKA210 = actionType === 'KA210';
   const goalCount = isKA210 ? '3' : '4-5';
@@ -548,6 +615,8 @@ export function getStarsGoalsPrompt(
   return `You are an expert Erasmus+ project designer defining project goals for a ${actionType} project.
 
 ${partnershipFacts || ''}
+
+${conceptContext || ''}
 
 THE CHALLENGE (from Section 3.1):
 ${challengeText}
@@ -617,11 +686,14 @@ export function getStarsTargetGroupsPrompt(
   sector: string,
   challengeText: string,
   partnershipFacts?: string,
-  sourceContext?: string
+  sourceContext?: string,
+  conceptContext?: string
 ): string {
   return `You are an expert Erasmus+ proposal writer defining target groups for a project in the ${sector} sector.
 
 ${partnershipFacts || ''}
+
+${conceptContext || ''}
 
 TARGET GROUP (as defined by the user):
 "${targetGroup}"
@@ -724,11 +796,14 @@ export function getStarsMethodologyPrompt(
   innovation: string,
   sector: string,
   partnershipFacts?: string,
-  sourceContext?: string
+  sourceContext?: string,
+  conceptContext?: string
 ): string {
   return `You are an expert Erasmus+ methodologist designing the methodological framework for a project in the ${sector} sector.
 
 ${partnershipFacts || ''}
+
+${conceptContext || ''}
 
 PROJECT IDEA:
 "${projectIdea}"
