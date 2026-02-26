@@ -12,6 +12,7 @@ import {
     getStarsTargetGroupsPrompt,
     getStarsMethodologyPrompt,
     getAssembleStarsExposePrompt,
+    buildPartnershipFactsBlock,
 } from '@/lib/stars-prompts';
 import { ResearchSource } from '@/types/concept';
 import { StarsGoal, StarsTargetGroup, StarsMethodPrinciple, StarsConceptProposal } from '@/types/stars-concept';
@@ -64,6 +65,33 @@ function buildSourceContext(sources: ResearchSource[]): string {
 export function useStarsGeneration() {
     const store = useStarsConceptStore();
     const partners = useAppStore(s => s.partners);
+
+    // ========================================================================
+    // SHARED: Build partnership facts block for all generators
+    // ========================================================================
+
+    const getPartnershipFacts = (): string => {
+        const allPartners = useAppStore.getState().partners;
+        const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
+        const budget = store.budgetTier || (store.actionType === 'KA220' ? 250000 : 60000);
+
+        // Build partner details from selected partners
+        const partnerDetails = store.selectedPartners.map(sp => {
+            const p = allPartners.find(pp => pp.id === sp.partnerId);
+            if (!p) return null;
+            return {
+                name: p.organizationName,
+                country: p.country,
+                city: p.city,
+                role: sp.role === 'COORDINATOR' ? 'Coordinator' : 'Partner',
+                type: p.organizationType || 'Organization',
+            };
+        }).filter(Boolean) as { name: string; country: string; city?: string; role: string; type: string }[];
+
+        if (partnerDetails.length === 0) return '';
+
+        return buildPartnershipFactsBlock(partnerDetails, budget, duration, store.actionType);
+    };
 
     // ========================================================================
     // Step 1: Idea Enhancement (reuse same logic as classic)
@@ -240,6 +268,7 @@ Antworte im JSON-Format:
             const sourceContext = buildSourceContext(store.sources);
             const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
             const budget = store.budgetTier || (store.actionType === 'KA220' ? 250000 : 60000);
+            const partnershipFacts = getPartnershipFacts();
 
             const prompt = getStarsConceptProposalsPrompt(
                 store.idea,
@@ -253,7 +282,8 @@ Antworte im JSON-Format:
                 duration,
                 budget,
                 sourceContext,
-                store.additionalInstructions
+                store.additionalInstructions,
+                partnershipFacts
             );
 
             const response = await generateContentAction(prompt, JSON_SYSTEM, 0.8, 60000);
@@ -341,7 +371,8 @@ Antworte im JSON-Format:
             }).filter(Boolean).join('\n');
 
             const ideaText = store.enhancedIdea || store.idea;
-            const prompt = getPartnershipNarrativePrompt(ideaText, partnersDetail, store.actionType, store.sector);
+            const partnershipFacts = getPartnershipFacts();
+            const prompt = getPartnershipNarrativePrompt(ideaText, partnersDetail, store.actionType, store.sector, partnershipFacts);
 
             const response = await generateContentAction(prompt, NARRATIVE_SYSTEM, 0.7, 45000);
             store.updateState({ partnershipNarrative: response.trim(), isGeneratingPartnershipNarrative: false });
@@ -365,6 +396,7 @@ Antworte im JSON-Format:
             const sourceContext = buildSourceContext(store.sources);
             const problemText = store.enhancedProblem || store.problem;
             const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
+            const partnershipFacts = getPartnershipFacts();
 
             const prompt = getChallengeNarrativePrompt(
                 problemText,
@@ -372,7 +404,8 @@ Antworte im JSON-Format:
                 store.sector,
                 sourceContext,
                 store.actionType,
-                duration
+                duration,
+                partnershipFacts
             );
 
             const response = await generateContentAction(prompt, NARRATIVE_SYSTEM, 0.7, 60000);
@@ -402,12 +435,14 @@ Antworte im JSON-Format:
         try {
             const sourceContext = buildSourceContext(store.sources);
             const ideaText = store.enhancedIdea || store.idea;
+            const partnershipFacts = getPartnershipFacts();
 
             const prompt = getOpportunityNarrativePrompt(
                 store.challengeNarrative,
                 ideaText,
                 sourceContext,
-                store.sector
+                store.sector,
+                partnershipFacts
             );
 
             const response = await generateContentAction(prompt, NARRATIVE_SYSTEM, 0.7, 60000);
@@ -438,12 +473,14 @@ Antworte im JSON-Format:
             const ideaText = store.enhancedIdea || store.idea;
             // Use projectResponse field from store for innovation -- or derive from idea
             const innovation = store.additionalInstructions || ideaText;
+            const partnershipFacts = getPartnershipFacts();
 
             const prompt = getProjectResponsePrompt(
                 store.challengeNarrative,
                 store.opportunityNarrative,
                 ideaText,
-                innovation
+                innovation,
+                partnershipFacts
             );
 
             const response = await generateContentAction(prompt, NARRATIVE_SYSTEM, 0.7, 60000);
@@ -474,13 +511,15 @@ Antworte im JSON-Format:
             const sourceContext = buildSourceContext(store.sources);
             const ideaText = store.enhancedIdea || store.idea;
             const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
+            const partnershipFacts = getPartnershipFacts();
 
             const prompt = getStarsGoalsPrompt(
                 store.challengeNarrative,
                 ideaText,
                 sourceContext,
                 duration,
-                store.actionType
+                store.actionType,
+                partnershipFacts
             );
 
             const response = await generateJsonContentAction(prompt, JSON_SYSTEM, 0.5);
@@ -515,12 +554,14 @@ Antworte im JSON-Format:
 
         try {
             const ideaText = store.enhancedIdea || store.idea;
+            const partnershipFacts = getPartnershipFacts();
 
             const prompt = getStarsTargetGroupsPrompt(
                 store.targetGroup,
                 ideaText,
                 store.sector,
-                store.challengeNarrative
+                store.challengeNarrative,
+                partnershipFacts
             );
 
             const response = await generateJsonContentAction(prompt, JSON_SYSTEM, 0.5);
@@ -561,12 +602,14 @@ Antworte im JSON-Format:
                 .map(g => `G${g.number}: ${g.statement}`)
                 .join('\n');
             const innovation = store.additionalInstructions || ideaText;
+            const partnershipFacts = getPartnershipFacts();
 
             const prompt = getStarsMethodologyPrompt(
                 ideaText,
                 goalsText,
                 innovation,
-                store.sector
+                store.sector,
+                partnershipFacts
             );
 
             const response = await generateJsonContentAction(prompt, JSON_SYSTEM, 0.5);
@@ -599,6 +642,7 @@ Antworte im JSON-Format:
 
         try {
             const allPartners = useAppStore.getState().partners;
+            const partnershipFacts = getPartnershipFacts();
 
             // Resolve title/acronym from selected concept
             const selectedConcept = store.conceptProposals.find(c => c.id === store.selectedConceptId);
@@ -647,7 +691,8 @@ Antworte im JSON-Format:
                 goalsJson,
                 targetGroupsJson,
                 methodologyJson,
-                store.additionalInstructions
+                store.additionalInstructions,
+                partnershipFacts
             );
 
             const response = await generateContentAction(
