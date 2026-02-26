@@ -78,6 +78,7 @@ PROBLEM / HERAUSFORDERUNG:
 
 RECHERCHEKRITERIEN:
 - NUR Studien und Berichte aus den letzten 3 Jahren (2023-2026).
+- INKLUSIVES WORDING: Nutze "Europa" oder "europäisch" anstelle von "EU", da bei Erasmus+ auch assoziierte Nicht-EU-Länder (z.B. Serbien) beteiligt sind.
 - STRUKTURIERE DEINE RECHERCHE NACH DEM TRICHTER-PRINZIP (Funnel-Ansatz: Makro -> Meso -> Mikro).
 - MAKRO-EBENE (International/Europäisch): Nutze primär Berichte von Organisationen mit anerkannter Analysekompetenz wie Eurydice-Netzwerk, CEDEFOP, OECD, Weltwirtschaftsforum und Europarat.
 - EU-DATENBANKEN: Nutze Instrumente wie das EU-Kompetenzpanorama oder die ESCO-Klassifikation zur Untermauerung von Qualifikationslücken oder Arbeitsmarktbedürfnissen.
@@ -224,6 +225,12 @@ ${isKA210 ? 'Halte die Konzepte REALISTISCH für ein kleines Budget (max 60k) un
 
 Nutze die Recherche-Ergebnisse als Grundlage und beziehe dich auf konkrete Daten.
 
+WICHTIGE LOGIK- UND WORTWAHL-REGELN:
+- INKLUSIVES WORDING: Nutze "Europa" oder "europäisch" anstelle von "EU" (z.B. "European workforce" statt "EU workforce"), da bei Erasmus+ auch assoziierte Nicht-EU-Länder (z.B. Serbien) gleichberechtigt beteiligt sind.
+- KEINE BUZZWORDS: Ersetze leere Begriffe wie "AI-based learning companion" durch konkrete, machbare technische Ansätze (z.B. "Web-basierte Applikation mit Anbindung an existierende LLM-APIs wie OpenAI").
+- VERMEIDE FLASCHENHÄLSE (Bottlenecks): Projektphasen müssen parallel oder überlappend stattfinden. Wenn z.B. Entwicklung auf Analyse aufbaut, zeige, wie die Entwicklung schon parallel starten kann.
+- TRAIN-THE-TRAINER: Wenn Pädagogen/Trainer ausgebildet werden, MUSS im Konzept klar werden, dass diese die Methoden/Tools in anschließenden Pilottests mit ihren eigenen Lernenden ausprobieren.
+
 SPRACHE: Antworte grundsätzlich auf ${language === 'de' ? 'Deutsch' : 'Englisch'}. 
 WICHTIGE AUSNAHME: Der Projekttitel und das Akronym MÜSSEN ZWINGEND auf Englisch sein, da der finale EU-Antrag auf Englisch eingereicht wird!
 
@@ -301,6 +308,7 @@ Antworte ZWINGEND im JSON-Format:
 export function getGenerateObjectivesPrompt(state: ConceptState, sourceContext: string, selectedConcept: any): string {
   const isKA210 = state.actionType === 'KA210';
   const objectiveCount = isKA210 ? '2-3' : '3-5';
+  const durationMonths = state.duration || (isKA210 ? 24 : 24);
 
   return `Du bist ein Erasmus+ Projektplaner${isKA210 ? ' für Kleine Partnerschaften (KA210)' : ''}.
 
@@ -312,19 +320,20 @@ ${selectedConcept.summary}
 
 PROBLEM: ${selectedConcept.problemStatement}
 INNOVATION: ${selectedConcept.innovation}
-AKTIONSTYP: ${state.actionType}${isKA210 ? ' (Budget max. 60k, Dauer max. 24 Monate)' : ''}
+AKTIONSTYP: ${state.actionType}${isKA210 ? ' (Kleine Partnerschaft)' : ' (Kooperationspartnerschaft)'}
+⚠️ PROJEKTLAUFZEIT: ${durationMonths} MONATE — Alle zeitbezogenen Formulierungen in den Zielen ("bis Ende des Projekts", "innerhalb von X Monaten" etc.) MÜSSEN sich auf diese ${durationMonths} Monate beziehen!
 
 RECHERCHE-QUELLEN:
 ${sourceContext}
 
 ${state.additionalInstructions ? `ZUSÄTZLICHE ANWEISUNGEN / FEHLENDE THEMEN (UNBEDINGT BEI DEN ZIELEN BERÜCKSICHTIGEN!):\n${state.additionalInstructions}\n` : ''}
-
 AUFGABE: Definiere ${objectiveCount} SMART-Ziele für dieses Projekt.
 Jedes Ziel muss:
 - Specific, Measurable, Achievable, Relevant, Time-bound sein
 - Konkrete Indikatoren haben (Zahlen!)
 - Sich auf die Recherche-Quellen beziehen (welche Studie belegt den Bedarf)
 - Einer Erasmus+ Priorität zugeordnet sein
+- Zeitangaben auf die tatsächliche Projektlaufzeit (${durationMonths} Monate) abstimmen!
 ${isKA210 ? '- REALISTISCH für ein kleines Budget und kurze Laufzeit sein' : ''}
 
 Antworte im JSON-Format:
@@ -376,6 +385,7 @@ Antworte im JSON-Format:
 export function getGenerateWorkPackagesPrompt(state: ConceptState, consortiumText: string, selectedConcept: any): string {
   const isKA210 = state.actionType === 'KA210';
   const objectivesContext = state.objectives.filter(o => state.selectedObjectiveIds.includes(o.id)).map((o, i) => `${i + 1}. ${o.text}`).join('\n');
+  const durationMonths = state.duration || (isKA210 ? 24 : 24);
 
   if (isKA210) {
     return `Du bist ein Erasmus+ Projektplaner für Kleine Partnerschaften (KA210).
@@ -397,9 +407,14 @@ ${consortiumText}
 
 RAHMENBEDINGUNGEN KA210:
 - Budget: max. 60.000 EUR
-- Dauer: max. 24 Monate
+⚠️ PROJEKTLAUFZEIT: ${durationMonths} MONATE — Alle Zeitangaben ("start"/"end") in den Aktivitäten MÜSSEN innerhalb von Monat 1 bis Monat ${durationMonths} liegen!
 - KEINE formalen Work Packages, sondern direkte AKTIVITÄTEN
 - Einfache, umsetzbare Struktur
+
+WICHTIGE LOGIK-REGELN FÜR AKTIVITÄTEN:
+- VERMEIDE FLASCHENHÄLSE (Bottlenecks): Aktivitäten müssen parallel oder leicht überlappend stattfinden. Wenn z.B. Aktivität 2 auf Analyse aus Aktivität 1 aufbaut, darf es keinen monatelangen Stillstand geben. Die Entwicklung muss schon parallel auf Basis von Zwischenergebnissen starten.
+- TRAIN-THE-TRAINER ANSATZ: Wenn Pädagogen/Trainer in einer Aktivität ausgebildet werden, MUSS in einer darauf folgenden Aktivität explizit gemacht werden, dass diese ihr Wissen in Pilotphasen mit ihren eigenen Lernenden testen/anwenden. So schließt sich der Kreis.
+- KEINE BUZZWORDS: Nutze für technische Ergebnisse konkrete Beschreibungen (z.B. "Web-Applikation mit LLM-API-Anbindung" statt "AI-based companion").
 
 ${state.additionalInstructions ? `ZUSÄTZLICHE ANWEISUNGEN / FEHLENDE THEMEN (UNBEDINGT ALS AKTIVITÄTEN/ERGEBNISSE INTEGRIEREN!):\n${state.additionalInstructions}\n` : ''}
 AUFGABE: Erstelle 3-5 Projektaktivitäten für dieses KA210 Projekt.
@@ -408,7 +423,10 @@ Jede Aktivität soll:
 - 2-3 konkrete Teilschritte beinhalten
 - 1-2 Ergebnisse/Outputs liefern
 - Einem Partner zugeordnet sein
-- Einen realistischen Zeitrahmen haben
+- Einen realistischen Zeitrahmen haben (START und END Monat müssen in die Gesamtlaufzeit von ${durationMonths} Monaten passen!)
+
+⚠️ VERTEILUNG DER LAUFZEIT:
+Verteile die Aktivitäten logisch über die ${durationMonths} Monate Laufzeit. Gehe NICHT automatisch von 24 Monaten aus! Die letzte Aktivität muss spätestens in Monat ${durationMonths} enden.
 
 Antworte im JSON-Format:
 {
@@ -420,7 +438,7 @@ Antworte im JSON-Format:
       "description": "Beschreibung der Aktivität (2-3 Sätze)",
       "activities": ["Teilschritt 1", "Teilschritt 2"],
       "deliverables": ["Ergebnis 1"],
-      "duration": { "start": 1, "end": 6 },
+      "duration": { "start": 1, "end": ${Math.round(durationMonths / 3)} },
       "lead": "Welcher Partner führt diese Aktivität"
     }
   ]
@@ -446,6 +464,13 @@ ${selectedConcept.mainOutputs.join('\n')}
 KONSORTIUM:
 ${consortiumText}
 
+⚠️ PROJEKTLAUFZEIT: ${durationMonths} MONATE — Alle Zeitangaben ("start"/"end") MÜSSEN innerhalb von Monat 1 bis Monat ${durationMonths} liegen! KEIN WP darf über Monat ${durationMonths} hinausgehen!
+
+WICHTIGE LOGIK-REGELN FÜR WORK PACKAGES:
+- VERMEIDE FLASCHENHÄLSE (Bottlenecks): Work Packages müssen parallel oder leicht überlappend stattfinden. Wenn z.B. WP2 auf der Analyse aus WP3 aufbaut, darf es keinen monatelangen Stillstand geben. Die Entwicklung muss schon parallel auf Basis von Zwischenergebnissen starten. (z.B. Needs Analysis D2.1 darf nicht den Rest des Projekts aufhalten!).
+- TRAIN-THE-TRAINER ANSATZ: Wenn Pädagogen/Trainer in einem WP ausgebildet werden, MUSS in einem darauf folgenden WP explizit gemacht werden, dass diese ihr Wissen in Pilotphasen mit ihren eigenen Lernenden testen/anwenden. So schließt sich der Kreis und der Impact multipliziert sich.
+- KEINE BUZZWORDS: Nutze für technische Ergebnisse konkrete Beschreibungen (z.B. "Web-Applikation mit LLM-API-Anbindung" statt "AI-based companion").
+
 ${state.additionalInstructions ? `ZUSÄTZLICHE ANWEISUNGEN / FEHLENDE THEMEN (UNBEDINGT IN DIE WORK PACKAGES INTEGRIEREN!):\n${state.additionalInstructions}\n` : ''}
 AUFGABE: Erstelle eine logische WP-Struktur (4-5 Work Packages + WP1 Management).
 Jedes WP soll:
@@ -453,7 +478,10 @@ Jedes WP soll:
 - 2-3 konkrete Aktivitäten beinhalten
 - 2-3 Deliverables haben
 - Einem Konsortium-Partner zugeordnet sein
-- Einen realistischen Zeitrahmen haben
+- Einen realistischen Zeitrahmen haben (START und END Monat müssen in die Laufzeit von ${durationMonths} Monaten passen!)
+
+⚠️ VERTEILUNG DER LAUFZEIT:
+Verteile die Aktivitäten logisch über die ${durationMonths} Monate. Gehe NICHT automatisch von 24 Monaten aus! Das letzte WP (Dissemination) muss im Monat ${durationMonths} enden.
 
 Antworte im JSON-Format:
 {
@@ -465,7 +493,7 @@ Antworte im JSON-Format:
       "description": "Beschreibung des WP (3-4 Sätze)",
       "activities": ["Aktivität 1", "Aktivität 2"],
       "deliverables": ["Deliverable 1", "Deliverable 2"],
-      "duration": { "start": 1, "end": 24 },
+      "duration": { "start": 1, "end": ${durationMonths} },
       "lead": "Welcher Partnertyp führt dieses WP"
     }
   ]
@@ -527,6 +555,12 @@ Fasse die geplante Umsetzung (Aktivitäten/Work Packages) verständlich zusammen
 
 # 5. Erwartete Wirkung (Impact)
 Welche nachhaltigen Veränderungen werden bei den Zielgruppen erreicht, auch über die Projektlaufzeit hinaus?
+
+WICHTIGE LOGIK- UND WORTWAHL-REGELN (ÜBERALL ANWENDEN):
+- INKLUSIVES WORDING: Nutze "Europa" oder "europäisch" anstelle von "EU", da bei Erasmus+ auch Assoziierte Nicht-EU-Länder (z.B. Westbalkan/Serbien) gleichberechtigt beteiligt sind.
+- KEINE BUZZWORDS: Ersetze leere Begriffe wie "AI-based learning companion" durch konkrete, machbare technische Ansätze (z.B. "Web-basierte Applikation mit Anbindung an existierende LLM-APIs").
+- KEINE FLASCHENHÄLSE (Bottlenecks): Mache deutlich, dass Work Packages überlappend und agil stattfinden ("Development starts based on preliminary analysis findings...").
+- TRAIN-THE-TRAINER: Wenn Pädagogen ausgebildet werden, mache explizit deutlich, dass sie diese Tools in Pilottests mit IHREN Lernenden erproben. Der logische Klebstoff dazwischen muss im Konzept deutlich werden.
 
 REGELN FÜR DIE AUSGABE:
 - Ausschließlich Markdown (kein JSON!)

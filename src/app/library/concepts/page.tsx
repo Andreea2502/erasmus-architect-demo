@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useLanguageStore } from '@/store/language-store';
+import { useConceptStore } from '@/store/concept-store';
+import { useRouter } from 'next/navigation';
 import { Lightbulb, Trash2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppShell } from '@/components/layout/AppShell';
@@ -10,6 +12,29 @@ import { AppShell } from '@/components/layout/AppShell';
 export default function ConceptsLibraryPage() {
     const { language } = useLanguageStore();
     const { savedConcepts, deleteSavedConcept } = useAppStore();
+    const router = useRouter();
+
+    const handleContinueToGenerator = (concept: any) => {
+        const { resetState, updateState } = useConceptStore.getState();
+        resetState();
+        updateState({
+            idea: concept.initialIdea || concept.problemStatement,
+            problem: concept.problemStatement,
+            sector: concept.sector,
+            actionType: concept.actionType,
+            budgetTier: concept.budgetBreakdown?.total || 250000,
+            duration: concept.duration || 24,
+            priorityFocus: concept.priority,
+            selectedPartners: (concept.partnerIds || []).map((id: string) => ({ partnerId: id, role: 'partner' })),
+            detailedConcept: concept.detailedConcept || null,
+            wpSuggestions: concept.workPackages || [],
+            selectedWpNumbers: (concept.workPackages || []).map((wp: any) => wp.number),
+            wpGenerated: !!(concept.workPackages?.length > 0),
+            currentStep: 6, // Jump straight to summary / generator export
+        });
+
+        router.push('/projects/new');
+    };
 
     return (
         <AppShell>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useLanguageStore } from '@/store/language-store';
 import { useAppStore } from '@/store/app-store';
 import { useTranslation } from '@/lib/i18n';
@@ -25,9 +26,11 @@ import { generateGuideAnswer } from '@/lib/ai-service';
 export function useProjectPipeline(initialProjectId?: string) {
     const { language, setLanguage } = useLanguageStore();
     const { t } = useTranslation(language);
+    const searchParams = useSearchParams();
     const [mounted, setMounted] = useState(false);
 
     // CRM Partners and Projects from Store
+    const isHydrated = useAppStore((state) => state.isHydrated);
     const crmPartners = useAppStore((state) => state.partners);
     const projects = useAppStore((state) => state.projects);
     const addProject = useAppStore((state) => state.addProject);
@@ -187,34 +190,39 @@ export function useProjectPipeline(initialProjectId?: string) {
             });
         });
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const projectIdFromUrl = urlParams.get('project') || urlParams.get('projectId') || initialProjectId;
-        const isFromConcept = urlParams.get('fromConcept') === 'true';
+        // Use the proper Next.js searchParams to reliably get data after router.push
+        const projectIdFromUrl = searchParams.get('project') || searchParams.get('projectId') || initialProjectId;
+        const isFromConcept = searchParams.get('fromConcept') === 'true';
 
         if (projectIdFromUrl) {
             setFromConcept(isFromConcept);
             setPendingProjectId(projectIdFromUrl);
         }
-    }, [initialProjectId, actionType]);
+    }, [initialProjectId, actionType, searchParams]);
 
     // Load existing project into generator
     const loadProjectIntoGenerator = (projectId: string, fromConcept: boolean = false) => {
         const project = projects.find(p => p.id === projectId);
         if (!project) return;
 
+        console.log(`[Generator] Loading project: ${project.title} (fromConcept: ${fromConcept})`);
         setCurrentProjectId(projectId);
 
         if (project.knowledgePool) {
             setProjectKnowledgePool(project.knowledgePool);
         }
 
-        if (project.generatorState) {
+        // When coming from Concept Developer export (fromConcept=true), ALWAYS rebuild from
+        // fresh project data so that the latest budget, duration, partners, and concept title
+        // are reflected. Only restore saved generatorState for direct navigation back.
+        if (project.generatorState && !fromConcept) {
             setPipelineState({
                 ...project.generatorState,
                 knowledgePool: project.knowledgePool || project.generatorState.knowledgePool,
             });
             setSetupPhase('ready');
             setProjectSaved(true);
+            console.log(`[Generator] Restored saved generator state`);
         } else {
             const projectConsortium: ConsortiumPartner[] = (project.consortium || []).map(c => {
                 const partner = crmPartners.find(p => p.id === c.partnerId);
@@ -235,7 +243,8 @@ export function useProjectPipeline(initialProjectId?: string) {
 
             const projectIdea: ProjectIdea = {
                 shortDescription: project.problemStatement || project.title,
-                mainObjective: 'Erasmus+ Projekt',
+                // Use real problem statement so AI has genuine project context
+                mainObjective: project.problemStatement || project.title || 'Erasmus+ Projekt',
                 targetGroups: project.targetGroups?.map(t => t.name) || [],
                 sector: project.sector,
                 actionType: project.actionType,
@@ -243,23 +252,26 @@ export function useProjectPipeline(initialProjectId?: string) {
 
             const initialState = createInitialPipelineState(projectConsortium, projectIdea, {
                 totalBudget: project.budgetTier,
-                wpCount: project.workPackages?.length || 5,
+                wpCount: project.workPackages?.length || (project.originalConcept?.workPackages?.length) || 5,
                 actionType: project.actionType,
+                duration: project.duration,
             }, project.originalConcept);
 
             setPipelineState(initialState);
             setSetupPhase('ready');
+            console.log(`[Generator] Built fresh state from project data: ${projectConsortium.length} partners, €${project.budgetTier}, ${project.duration}m`);
         }
     };
 
     useEffect(() => {
-        if (!pendingProjectId || currentProjectId) return;
+        if (!isHydrated || !pendingProjectId || currentProjectId) return;
+
         const project = projects.find(p => p.id === pendingProjectId);
         if (project) {
             loadProjectIntoGenerator(pendingProjectId, fromConcept);
             setPendingProjectId(null);
         }
-    }, [projects, pendingProjectId, currentProjectId, fromConcept]);
+    }, [isHydrated, projects, pendingProjectId, currentProjectId, fromConcept]);
 
     const allPartners: ConsortiumPartner[] = [
         ...crmPartners

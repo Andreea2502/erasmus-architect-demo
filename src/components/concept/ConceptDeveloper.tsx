@@ -11,6 +11,8 @@ import { useAppStore } from '@/store/app-store';
 import { useLanguageStore } from '@/store/language-store';
 import { extractTextFromPDF, extractTextFromDocx } from '@/lib/rag-system';
 
+import { useRouter } from 'next/navigation';
+
 import { Step1Idea } from './steps/Step1Idea';
 import { Step2Sources } from './steps/Step2Sources';
 import { Step3Consortium } from './steps/Step3Consortium';
@@ -37,6 +39,7 @@ const STEPS = [
 ];
 
 export function ConceptDeveloper({ resumeProjectId }: { resumeProjectId?: string } = {}) {
+  const router = useRouter();
   const language = useLanguageStore(s => s.language);
   const partners = useAppStore(s => s.partners);
   const projects = useAppStore(s => s.projects);
@@ -361,8 +364,8 @@ export function ConceptDeveloper({ resumeProjectId }: { resumeProjectId?: string
       status: 'DRAFT',
       actionType: store.actionType as any,
       sector: store.sector as any,
-      budgetTier: store.actionType === 'KA220' ? 250000 : 60000,
-      duration: store.actionType === 'KA210' ? 12 : 24,
+      budgetTier: store.budgetTier || (store.actionType === 'KA220' ? 250000 : 60000),
+      duration: store.duration || (store.actionType === 'KA210' ? 12 : 24),
       callYear: new Date().getFullYear(),
       horizontalPriorities: selectedConcept.erasmusPriorities || [],
       problemStatement: selectedConcept.problemStatement,
@@ -451,6 +454,7 @@ export function ConceptDeveloper({ resumeProjectId }: { resumeProjectId?: string
             sources: o.sources || [],
             erasmusPriority: o.erasmusPriority,
           })),
+        detailedConcept: store.detailedConcept || undefined,
       },
       conceptDeveloperState: undefined, // Clear dev state after export
     };
@@ -464,7 +468,7 @@ export function ConceptDeveloper({ resumeProjectId }: { resumeProjectId?: string
     }
 
     // Redirect to generator with this project
-    window.location.href = `/generator?project=${projectId}&fromConcept=true`;
+    router.push(`/generator?project=${projectId}&fromConcept=true`);
   };
 
   const currentStep = store.currentStep;

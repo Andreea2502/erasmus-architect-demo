@@ -1666,6 +1666,7 @@ Titel: ${originalConcept.title}
 Problem: ${originalConcept.problemStatement}
 Innovation: ${originalConcept.innovation}
 Erwarteter Impact: ${originalConcept.expectedImpact}
+${originalConcept.detailedConcept ? `Detailliertes Konzept (WICHTIGSTE QUELLE):\n${originalConcept.detailedConcept}\n` : ''}
 Verwendete Quellen/Studien aus Recherche:
 ${originalConcept.studyReferences?.map(s => `- ${s.title} (${s.url || 'Keine URL'}): ${s.snippet || ''}`).join('\n') || 'Keine spezifischen Quellen'}
 ${originalConcept.objectives && originalConcept.objectives.length > 0 ? `
@@ -1682,28 +1683,36 @@ Schreibe eine professionelle, überzeugende Antwort (ca. 400-600 Wörter / 3000-
 ${knowledgePoolContext ? '- Integriere relevante Informationen aus der Projekt-Wissensdatenbank!' : ''}
 
 === FORMATIERUNG (WICHTIG!) ===
-Nutze IMMER Markdown für gute Lesbarkeit:
-- **## Überschriften** für Hauptabschnitte (z.B. ## Projektmanagement, ## Kommunikation)
-- **### Unterüberschriften** für Teilbereiche
-- **Bullet Points** mit - für Aufzählungen
-- **Fett** mit **text** für wichtige Begriffe
-- Strukturiere in klare, überschaubare Absätze
-- Mindestens 2-3 Hauptüberschriften pro Antwort!
+Nutze IMMER sauberes Markdown für gute Lesbarkeit:
+- **### Überschriften** (H3) für Hauptabschnitte (NICHT ## H2 verwenden!)
+- **#### Unterüberschriften** (H4) für Teilbereiche
+- **Bullet Points** mit - für Aufzählungen (max. 3-4 Punkte pro Liste)
+- **Fett** NUR für Schlüsselbegriffe (sparsam einsetzen, nicht ganze Sätze fetten!)
+- Strukturiere in kurze, gut lesbare Absätze (max. 3-4 Sätze pro Absatz)
+- Trenne Sinnabschnitte klar voneinander
 
 ${`Antwort in ${LANGUAGE_NAMES[language as Language] || language}:`}`;
 
-  const systemContext = `Du bist ein Erasmus+ Experte. Schreibe präzise, faktenbasiert und überzeugend.
-Wenn Wissen aus der Projekt-Wissensdatenbank oder Studien vorhanden ist, integriere es in die Antwort.
-Verwende konkrete Fakten, Zahlen und Erkenntnisse aus den bereitgestellten Dokumenten.
+  const systemContext = `Du bist ein hochpräziser Erasmus+ Experte.
+REGEL 1: Halte dich AUSSCHLIESSLICH an die Fakten aus dem "URSPRÜNGLICHEN KONZEPT". Erfinde KEINE neuen Aktivitäten, Partner, Ergebnisse oder Zielgruppen, die dort nicht erwähnt sind!
+REGEL 2: Wenn Details fehlen, beschreibe den Ansatz generisch, aber logisch passend zur Konzept-Innovation.
+REGEL 3: Integriere Wissen aus der Projekt-Wissensdatenbank organisch.
 
-WICHTIG: Formatiere IMMER mit Markdown:
-- ## Überschriften für Hauptabschnitte
-- ### Unterüberschriften für Details
-- Bullet Points mit - für Listen
-- **Fett** für wichtige Begriffe
-- Mindestens 2-3 strukturierte Abschnitte pro Antwort!
+WICHTIGE LOGIK- UND WORTWAHL-REGELN (ÜBERALL ANWENDEN):
+- INKLUSIVES WORDING: Nutze "Europa" oder "europäisch" anstelle von "EU" (z.B. "European workforce" statt "EU workforce"), da auch assoziierte Nicht-EU-Länder (z.B. Serbien) beteiligt sind.
+- KEINE BUZZWORDS: Ersetze leere Begriffe wie "AI-based learning companion" durch konkrete, machbare technische Ansätze (z.B. "Web-basierte Applikation mit Anbindung an existierende LLM-APIs").
+- VERMEIDE FLASCHENHÄLSE (Bottlenecks): Work Packages und Projektphasen müssen parallel oder leicht überlappend stattfinden (z.B. Entwicklung startet bereits mit Zwischenergebnissen der Analyse).
+- TRAIN-THE-TRAINER: Wenn Pädagogen/Trainer ausgebildet werden, mache explizit deutlich, dass sie diese Tools danach in Pilottests mit ihren eigenen Lernenden erproben. Der Transfer in die Praxis muss klar sein.
 
-🔴 KRITISCHE REGEL: Echte Erasmus+ Anträge erfordern Text-Tiefe! Generiere Antworten im Bereich von 3000-4000 Zeichen (ca. 400-600 Wörter). Unterschreite diese Länge NICHT!`;
+WICHTIG: Formatiere IMMER mit extrem sauberem Markdown:
+- **### Überschriften** (H3) für Hauptabschnitte (NICHT ## H2 verwenden!)
+- **#### Unterüberschriften** (H4) für Details
+- Bullet Points mit - für konkrete Aufzählungen
+- **Fett** NUR für Schlüsselbegriffe (sparsam, nie ganze Sätze!)
+- ERFINDE KEINE neuen Details, die nicht im Konzept oder den Quellen stehen!
+- Mindestens 2-3 strukturierte Abschnitte pro Antwort.
+
+🔴 LÄNGEN-VORGABEN: Generiere Antworten im Bereich von 2000-3500 Zeichen (ca. 300-500 Wörter). Qualität und Faktentreue sind wichtiger als bloße Textmasse!`;
 
   try {
     const response = await callGeminiForPipeline(prompt, systemContext, 0.7);
@@ -2001,7 +2010,7 @@ Hauptziel: ${state.idea.mainObjective}
 ${state.originalConcept ? `
 Konzept-Innovation: ${state.originalConcept.innovation}
 Problemstellung: ${state.originalConcept.problemStatement}
-` : ''}`;
+${state.originalConcept.detailedConcept ? `Detailliertes Konzept (WICHTIGSTE QUELLE):\n${state.originalConcept.detailedConcept}\n` : ''}` : ''}`;
 
   // Existing text context (for improvements)
   const existingTextContext = existingValue
@@ -2131,18 +2140,34 @@ KEINE erfundenen Details! Schreibe in ${LANGUAGE_NAMES[language as Language] || 
   }
 
   // System context for AI
-  const systemContext = `Du bist ein Erasmus+ Experte und schreibst Partnerbeschreibungen.
+  const systemContext = `Du bist ein Erasmus+ Experte und schreibst Partnerbeschreibungen für echte Förderanträge.
 
-KRITISCHE REGELN:
-1. PRIORISIERE die "PROJEKT-WISSENSDATENBANK" - dort stehen verifizierte Daten!
-2. ${hasProjectsInKnowledge ? 'WICHTIG: Es gibt EU-Projekte in den Dokumenten - der Partner ist ERFAHREN!' : ''}
-3. FORMATIERUNG: Schreibe FLIESSTEXT, KEINE ## oder ### Überschriften!
-4. Verwende **fett** nur für einzelne Begriffe/Projektnamen
-5. Strukturiere mit Absätzen (Leerzeilen)
-6. Aufzählungen mit Spiegelstrichen (-)
-7. Schreibe AUSFÜHRLICH (600-900 Wörter für Haupt-Fragen)
-${existingValue ? '8. Der Benutzer hat bereits Text - BAUE DARAUF AUF!' : ''}
-${instruction ? '9. Folge der BENUTZER-ANWEISUNG!' : ''}
+⚠️ ANTI-HALLUZINATIONS-REGEL (ABSOLUT VERBINDLICH):
+Du darfst NIEMALS organisationsspezifische Fakten erfinden. Das bedeutet:
+- KEINE erfundenen Projektnamen, Akronyme oder Projektnummern
+- KEINE erfundenen Jahreszahlen, Statistiken, Kennzahlen oder Mitarbeiterzahlen
+- KEINE erfundenen Programmnamen (z.B. "Erasmus+ KA2", "Horizon 2020") wenn diese nicht in den Daten stehen
+- KEINE erfundenen Kooperationspartner oder geographische Details die nicht belegt sind
+- Wenn du dir bei einer Information nicht sicher bist: LASS SIE WEG oder formuliere allgemein ("die Organisation hat Erfahrung in...")
+
+WICHTIGE LOGIK- UND WORTWAHL-REGELN:
+- INKLUSIVES WORDING: Nutze grundsätzlich "Europa" oder "europäisch" anstelle von "EU", da bei Erasmus+ auch Assoziierte Nicht-EU-Länder (wie z.B. Serbien, Türkei, Nordmazedonien) voll beteiligt sind.
+- KEINE BUZZWORDS: Beschreibe technische oder methodische Expertise konkret und nachvollziehbar (welche Technologien/Ansätze genau?) anstatt leere Buzzwords zu verwenden.
+
+ZWEI KATEGORIEN FÜR DEINEN TEXT:
+1. ✅ VERIFIZIERTE DATEN: Alles in "PARTNER:", "BISHERIGE PROJEKTE", "KI-GENERIERTE BESCHREIBUNGEN", "DOKUMENTIERTE NACHWEISE", "PROJEKT-WISSENSDATENBANK" → Diese Daten 1:1 verwenden und konkret benennen
+2. 💭 ERLAUBTE SCHLUSSFOLGERUNGEN: Allgemeine Formulierungen über Kompetenzen, Motivation, Themenrelevanz basierend auf Expertisefeldern und Zielgruppen → Ohne erfundene Spezifika
+
+${hasProjectsInKnowledge ? '✅ HINWEIS: Es gibt EU-Projekte in den Dokumenten - beschreibe DIESE konkret!' : '⚠️ HINWEIS: Keine EU-Projekte in den Dokumenten - keine Projekte erfinden!'}
+
+FORMATIERUNG:
+- Schreibe FLIESSTEXT, KEINE ## oder ### Überschriften!
+- Verwende **fett** nur für einzelne Begriffe/Projektnamen
+- Strukturiere mit Absätzen (Leerzeilen)
+- Aufzählungen mit Spiegelstrichen (-)
+- Schreibe AUSFÜHRLICH (600-900 Wörter für Haupt-Fragen)
+${existingValue ? '- Der Benutzer hat bereits Text - BAUE DARAUF AUF!' : ''}
+${instruction ? '- Folge der BENUTZER-ANWEISUNG!' : ''}
 
 Schreibe in ${LANGUAGE_NAMES[language as Language] || language}.`;
 
@@ -3141,6 +3166,7 @@ export async function generateSingleWorkPackage(
 Projekt-Innovation: ${state.originalConcept.innovation || 'N/A'}
 Problemstellung: ${state.originalConcept.problemStatement || 'N/A'}
 Erwarteter Impact: ${state.originalConcept.expectedImpact || 'N/A'}
+${state.originalConcept.detailedConcept ? `\nDetailliertes Konzept (WICHTIGSTE QUELLE):\n${state.originalConcept.detailedConcept}\n` : ''}
 ${state.originalConcept.ltta ? `LTTA geplant: ${state.originalConcept.ltta.count} Events mit ${state.originalConcept.ltta.participants} Teilnehmern` : ''}
 ${state.originalConcept.multiplierEvents ? `Multiplier Events: ${state.originalConcept.multiplierEvents.count} Events` : ''}
 `
@@ -3264,16 +3290,25 @@ Antworte als JSON. ACHTUNG auf Mindestlängen!
   "budgetRationale": "MINDESTENS ca. ${language === 'de' ? '500-550' : '650-700'} Wörter (${language === 'de' ? '3500-4000' : '4500-5000'} Zeichen)! Erkläre SEHR AUSFÜHRLICH: Wie wird das Budget verwendet? Welche Kostenpositionen gibt es? Warum ist jede Kostenposition..."
 }
 
-=== FORMATIERUNG ===
-In der "description" nutze Markdown:
-- ## Überschriften für Hauptabschnitte
-- ### Unterüberschriften
-- **Fett** für wichtige Begriffe
-- Bullet Points mit -
+=== FORMATIERUNG (WICHTIG!) ===
+In der "description" nutze strenges Markdown:
+- **### Überschriften** (H3) für Hauptabschnitte (NICHT ## H2 verwenden!)
+- **#### Unterüberschriften** (H4) für Details
+- **Fett** NUR für Schlüsselbegriffe (sparsam, nie ganze Sätze!)
+- Bullet Points mit - für konkrete Schritte
+- ERFINDE KEINE neuen Aktivitäten oder Outputs, die nicht im Konzept stehen!
 
 Schreibe auf ${LANGUAGE_NAMES[language as Language] || language}.`;
 
-  const systemContext = `Du bist ein Erasmus+ WP-Experte. Generiere detaillierte, professionelle Work Package Inhalte.
+  const systemContext = `Du bist ein hochpräziser Erasmus+ WP-Experte. Generiere detaillierte, professionelle Work Package Inhalte.
+REGEL 1: Halte dich absolut strikt an das "URSPRÜNGLICHE KONZEPT". Keine neuen Deliverables, Partner oder Zeitpläne erfinden.
+REGEL 2: Nutze sauberes Markdown (H3/H4, Bullet Points).
+
+WICHTIGE LOGIK-REGELN FÜR WORK PACKAGES:
+- VERMEIDE FLASCHENHÄLSE (Bottlenecks): Work Packages müssen parallel oder leicht überlappend stattfinden. Wenn WP2 auf der Analyse aus WP3 aufbaut, zeige klar auf, dass die Entwicklung schon parallel startet, z.B. auf Basis von Vorabergebnissen.
+- TRAIN-THE-TRAINER ANSATZ: Wenn Pädagogen/Trainer in diesem WP ausgebildet werden (oder in einem vorherigen WP ausgebildet wurden), integriere Pilottests oder Implementierungsphasen, in denen diese ihr Wissen mit ihren eigenen Lernenden anwenden.
+- KEINE BUZZWORDS: Nutze für technische Ergebnisse konkrete Beschreibungen (z.B. "Web-Applikation mit LLM-API-Anbindung" statt "AI-based companion"). Zeige die technische Machbarkeit.
+- INKLUSIVES WORDING: Nutze "Europa" oder "europäisch" statt "EU", um Nicht-EU-Länder (wie Serbien) korrekt abzubilden.
 
 ⚠️⚠️⚠️ KRITISCH - TEXTLÄNGE (+/- 10-15% Toleranz) ⚠️⚠️⚠️
 - "description" MUSS ca. ${language === 'de' ? '280-320' : '350-400'} Wörter haben (ausführlicher Fließtext!)
@@ -3302,14 +3337,14 @@ QUALITÄTS-ANFORDERUNGEN:
 
     // Create WorkPackage object
     const workPackage: WorkPackage = {
-      id: `wp${wpNumber}`,
+      id: `wp${wpNumber} `,
       number: wpNumber,
       title: language === 'de' ? wpConfig.titleDE : wpConfig.title,
-      duration: `M${wpConfig.duration.start}-M${wpConfig.duration.end}`,
+      duration: `M${wpConfig.duration.start} -M${wpConfig.duration.end} `,
       objectives: wpData.objectives || [],
       description: wpData.description || '',
       activities: (wpData.activities || []).map((act: any, i: number) => ({
-        id: `wp${wpNumber}-act${i + 1}`,
+        id: `wp${wpNumber} -act${i + 1} `,
         title: act.title,
         description: act.description,
         content: act.description, // For display compatibility
@@ -3322,11 +3357,11 @@ QUALITÄTS-ANFORDERUNGEN:
         responsible: leadPartnerName // For display compatibility
       })),
       deliverables: (wpData.deliverables || []).map((del: any, i: number) => ({
-        id: `wp${wpNumber}-del${i + 1}`,
+        id: `wp${wpNumber} -del${i + 1} `,
         title: del.title,
         description: del.description,
         type: del.type || 'Report',
-        month: `M${del.completionMonth}`,
+        month: `M${del.completionMonth} `,
         dueMonth: del.completionMonth // For display compatibility
       })),
       budget: Math.round((state.configuration?.totalBudget || 250000) * wpConfig.budgetPercent / 100)
@@ -3334,37 +3369,37 @@ QUALITÄTS-ANFORDERUNGEN:
 
     // Create answers for the official pipeline structure
     const answers: Record<string, AnswerData> = {
-      [`wp_objectives_wp${wpNumber}`]: {
+      [`wp_objectives_wp${wpNumber} `]: {
         value: wpData.objectives?.join('\n\n') || '',
         mode: 'ai',
         lastEditedAt: new Date().toISOString()
       },
-      [`wp_description_wp${wpNumber}`]: {
+      [`wp_description_wp${wpNumber} `]: {
         value: wpData.description || '',
         mode: 'ai',
         lastEditedAt: new Date().toISOString()
       },
-      [`wp_activities_wp${wpNumber}`]: {
-        value: wpData.activities?.map((a: any) => `**${a.title}** (${a.type}, M${a.monthStart}-M${a.monthEnd})\n${a.description}`).join('\n\n') || '',
+      [`wp_activities_wp${wpNumber} `]: {
+        value: wpData.activities?.map((a: any) => `** ${a.title}** (${a.type}, M${a.monthStart} -M${a.monthEnd}) \n${a.description} `).join('\n\n') || '',
         mode: 'ai',
         lastEditedAt: new Date().toISOString()
       },
-      [`wp_deliverables_wp${wpNumber}`]: {
-        value: wpData.deliverables?.map((d: any) => `**${d.title}** (${d.type}, M${d.completionMonth})\n${d.description}`).join('\n\n') || '',
+      [`wp_deliverables_wp${wpNumber} `]: {
+        value: wpData.deliverables?.map((d: any) => `** ${d.title}** (${d.type}, M${d.completionMonth}) \n${d.description} `).join('\n\n') || '',
         mode: 'ai',
         lastEditedAt: new Date().toISOString()
       },
-      [`wp_indicators_wp${wpNumber}`]: {
-        value: wpData.indicators?.map((ind: any) => `**${ind.indicator}**\nZiel: ${ind.target}\nMessung: ${ind.measurementMethod}`).join('\n\n') || '',
+      [`wp_indicators_wp${wpNumber} `]: {
+        value: wpData.indicators?.map((ind: any) => `** ${ind.indicator}**\nZiel: ${ind.target} \nMessung: ${ind.measurementMethod} `).join('\n\n') || '',
         mode: 'ai',
         lastEditedAt: new Date().toISOString()
       },
-      [`wp_partners_wp${wpNumber}`]: {
-        value: Object.entries(wpData.partnerRoles || {}).map(([partner, role]) => `**${partner}**: ${role}`).join('\n\n') || '',
+      [`wp_partners_wp${wpNumber} `]: {
+        value: Object.entries(wpData.partnerRoles || {}).map(([partner, role]) => `** ${partner}**: ${role} `).join('\n\n') || '',
         mode: 'ai',
         lastEditedAt: new Date().toISOString()
       },
-      [`wp_budget_wp${wpNumber}`]: {
+      [`wp_budget_wp${wpNumber} `]: {
         value: wpData.budgetRationale || '',
         mode: 'ai',
         lastEditedAt: new Date().toISOString()
@@ -3376,15 +3411,15 @@ QUALITÄTS-ANFORDERUNGEN:
     const activities = wpData.activities || [];
     for (let actNum = 1; actNum <= 3; actNum++) {
       const activity = activities[actNum - 1];
-      const contentKey = `wp_act${actNum}_content_wp${wpNumber}`;
-      const objectivesKey = `wp_act${actNum}_objectives_wp${wpNumber}`;
-      const resultsKey = `wp_act${actNum}_results_wp${wpNumber}`;
-      const participantsKey = `wp_act${actNum}_participants_wp${wpNumber}`;
+      const contentKey = `wp_act${actNum}_content_wp${wpNumber} `;
+      const objectivesKey = `wp_act${actNum}_objectives_wp${wpNumber} `;
+      const resultsKey = `wp_act${actNum}_results_wp${wpNumber} `;
+      const participantsKey = `wp_act${actNum}_participants_wp${wpNumber} `;
 
       if (activity) {
         // Content: Describe the content of the proposed activities
         answers[contentKey] = {
-          value: activity.content || activity.description || `${activity.title}: ${activity.description || 'Activity description'}`,
+          value: activity.content || activity.description || `${activity.title}: ${activity.description || 'Activity description'} `,
           mode: 'ai',
           lastEditedAt: new Date().toISOString()
         };
@@ -3402,7 +3437,7 @@ QUALITÄTS-ANFORDERUNGEN:
         };
         // Participants: Number and profile of participants
         answers[participantsKey] = {
-          value: activity.participants || `Participants will include project partners, associated partners, and relevant stakeholders (estimated 15-30 participants per activity).`,
+          value: activity.participants || `Participants will include project partners, associated partners, and relevant stakeholders(estimated 15 - 30 participants per activity).`,
           mode: 'ai',
           lastEditedAt: new Date().toISOString()
         };
@@ -3420,15 +3455,15 @@ QUALITÄTS-ANFORDERUNGEN:
     return { workPackage, answers };
 
   } catch (error: any) {
-    console.error(`[generateSingleWorkPackage] Error:`, error.message);
+    console.error(`[generateSingleWorkPackage] Error: `, error.message);
 
     // Return minimal WP on error
     return {
       workPackage: {
-        id: `wp${wpNumber}`,
+        id: `wp${wpNumber} `,
         number: wpNumber,
         title: language === 'de' ? wpConfig.titleDE : wpConfig.title,
-        duration: `M${wpConfig.duration.start}-M${wpConfig.duration.end}`,
+        duration: `M${wpConfig.duration.start} -M${wpConfig.duration.end} `,
         objectives: [],
         description: '',
         activities: [],
@@ -3459,34 +3494,34 @@ export async function runCriticalEvaluator(
   }
 
   const ragContext = await getRAGContext(
-    `Erasmus+ Evaluierungskriterien ${step.name} Bewertung Qualität`
+    `Erasmus + Evaluierungskriterien ${step.name} Bewertung Qualität`
   );
 
-  const prompt = `Du bist ein strenger, erfahrener Erasmus+ Evaluator. Bewerte den folgenden Antragsteil kritisch.
-  
-  SCHRITT: ${step.name}
+  const prompt = `Du bist ein strenger, erfahrener Erasmus + Evaluator.Bewerte den folgenden Antragsteil kritisch.
+
+    SCHRITT: ${step.name}
   
   GENERIERTER INHALT:
   ${JSON.stringify(generatedContent, null, 2)}
-  
+
   PROJEKTKONTEXT:
   - Titel: ${state.projectTitle || 'Noch nicht definiert'}
   
   ${ragContext}
   
-  Bewerte nach Erasmus+ Standards (Relevanz, Design, Team, Impact).
+  Bewerte nach Erasmus + Standards(Relevanz, Design, Team, Impact).
   Sei KRITISCH aber KONSTRUKTIV.
   
   Antwort als JSON:
   {
     "score": 7,
-    "strengths": ["Stärke 1", "..."],
-    "weaknesses": ["**Titel**: Erklärung"],
-    "suggestions": ["Vorschlag 1"],
-    "criticalIssues": []
-  }`;
+      "strengths": ["Stärke 1", "..."],
+        "weaknesses": ["**Titel**: Erklärung"],
+          "suggestions": ["Vorschlag 1"],
+            "criticalIssues": []
+  } `;
 
-  const systemContext = `Du bist ein kritischer Erasmus+ Evaluator.`;
+  const systemContext = `Du bist ein kritischer Erasmus + Evaluator.`;
 
   try {
     const response = await callGeminiForPipeline(prompt, systemContext, 0.4);
@@ -3506,11 +3541,11 @@ export async function runCriticalEvaluator(
         };
       }
     } catch (parseError) {
-      console.warn(`[runCriticalEvaluator] JSON parse failed:`, parseError);
+      console.warn(`[runCriticalEvaluator] JSON parse failed: `, parseError);
     }
   } catch (e: any) {
     // Graceful fallback: Evaluator failure should NOT crash the step
-    console.warn(`[runCriticalEvaluator] Evaluation failed (likely rate limit):`, e.message);
+    console.warn(`[runCriticalEvaluator] Evaluation failed(likely rate limit): `, e.message);
     return {
       step: stepNumber,
       stepName: step.name,
@@ -3553,7 +3588,7 @@ export async function executeStep(
   const actionType = state.configuration?.actionType || 'KA220';
   const wpCount = state.configuration?.wpCount || 5;
   const structure = getOfficialPipelineStructure(actionType, wpCount);
-  const stepName = structure.find((c: any) => c.id === stepNumber)?.title || `Step ${stepNumber}`;
+  const stepName = structure.find((c: any) => c.id === stepNumber)?.title || `Step ${stepNumber} `;
 
   // Handle sub-steps for Step 2 (Organisations) and Step 6 (Work Packages)
   if (stepNumber === 2 && subStepIndex !== undefined) {
@@ -3649,10 +3684,10 @@ export async function executeStep(
             criticalIssues: evalResult.evaluation.consistencyIssues.map(i => i.issue)
           }
         };
-      default: throw new Error(`Unknown step ${stepNumber}`);
+      default: throw new Error(`Unknown step ${stepNumber} `);
     }
   } catch (e: any) {
-    console.error(`Error generating step ${stepNumber}:`, e);
+    console.error(`Error generating step ${stepNumber}: `, e);
     throw e;
   }
 
@@ -3668,10 +3703,10 @@ export async function executeStep(
   let evaluationStepName = stepName;
   if (stepNumber === 2 && subStepIndex !== undefined) {
     const partner = state.consortium[subStepIndex];
-    evaluationStepName = partner ? `Organisations - ${partner.name}` : `Partner ${subStepIndex + 1}`;
+    evaluationStepName = partner ? `Organisations - ${partner.name} ` : `Partner ${subStepIndex + 1} `;
   } else if (stepNumber === 6 && subStepIndex !== undefined) {
     const wpNumber = subStepIndex + 1;
-    evaluationStepName = `Work Package ${wpNumber}`;
+    evaluationStepName = `Work Package ${wpNumber} `;
   }
 
   onProgress?.('Kritische Bewertung läuft...');
@@ -3729,7 +3764,7 @@ export function createInitialPipelineState(
       };
     });
 
-    console.log(`[createInitialPipelineState] WP Configurations created:`, wpConfigurations.map(w => `WP${w.wpNumber}: ${w.title} (${w.type}, ${w.budgetPercent}%)`));
+    console.log(`[createInitialPipelineState] WP Configurations created: `, wpConfigurations.map(w => `WP${w.wpNumber}: ${w.title} (${w.type}, ${w.budgetPercent}%)`));
   }
 
   return {

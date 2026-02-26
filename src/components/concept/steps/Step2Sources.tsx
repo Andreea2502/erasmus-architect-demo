@@ -58,12 +58,26 @@ export function Step2Sources({
 
     const selectConcept = (id: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
+        const isDifferentConcept = store.selectedConceptId !== id;
         store.updateState({
             selectedConceptId: id,
             concepts: store.concepts.map(c => ({
                 ...c,
                 selected: c.id === id,
-            }))
+            })),
+            // Clear downstream state when switching to a different concept
+            ...(isDifferentConcept ? {
+                detailedConcept: null,
+                detailedConceptError: undefined,
+                objectives: [],
+                selectedObjectiveIds: [],
+                objectivesGenerated: false,
+                objectivesError: undefined,
+                wpSuggestions: [],
+                selectedWpNumbers: [],
+                wpGenerated: false,
+                wpError: undefined,
+            } : {})
         });
     };
 
@@ -255,9 +269,9 @@ export function Step2Sources({
 
             {/* Error Message */}
             {store.conceptError && (
-                <FeedbackMessage 
-                    type="error" 
-                    message={store.conceptError} 
+                <FeedbackMessage
+                    type="error"
+                    message={store.conceptError}
                     onRetry={() => { store.updateState({ conceptError: undefined }); generateConcepts(); }}
                     className="mt-4"
                 />
@@ -395,9 +409,9 @@ export function Step2Sources({
                     </div>
 
                     {store.compareConceptsError && (
-                        <FeedbackMessage 
-                            type="error" 
-                            message={store.compareConceptsError} 
+                        <FeedbackMessage
+                            type="error"
+                            message={store.compareConceptsError}
                             className="mt-4"
                         />
                     )}
