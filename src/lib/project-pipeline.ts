@@ -2407,44 +2407,48 @@ async function generateActivitiesFieldBundled(
     `- ${p.name} (${p.country}, ${p.type}): ${p.expertise?.join(', ') || 'N/A'}`
   ).join('\n');
 
-  const fieldDescriptions: Record<string, { label: string; question: string; charLimit: number }> = {
+  const fieldDescriptions: Record<string, { label: string; question: string }> = {
     content: {
-      label: 'Inhalt/Content',
-      question: 'Beschreibe den Inhalt jeder Aktivität: Welche spezifischen Aufgaben, Workshops, Meetings oder Outputs werden produziert?',
-      charLimit: 1500
+      label: 'Content',
+      question: 'Describe the content of the proposed activities.'
     },
     objectives: {
-      label: 'Zielausrichtung/Objectives Alignment',
-      question: 'Erkläre, wie jede Aktivität zu den WP-Zielen beiträgt. Wie unterstützt sie die Gesamtziele des Projekts?',
-      charLimit: 1000
+      label: 'Objectives',
+      question: 'Explain how these activities are going to help reach the WP objectives.'
     },
     results: {
-      label: 'Erwartete Ergebnisse/Expected Results',
-      question: 'Beschreibe die erwarteten Ergebnisse jeder Aktivität. Welche konkreten Outcomes und Deliverables werden erzielt?',
-      charLimit: 1000
+      label: 'Expected Results',
+      question: 'Describe the expected results of the activities.'
     },
     participants: {
-      label: 'Teilnehmer/Participants',
-      question: 'Nenne die erwartete Anzahl und das Profil der Teilnehmer für jede Aktivität. Wer ist beteiligt und in welcher Funktion?',
-      charLimit: 800
+      label: 'Participants',
+      question: 'Expected number and profile of participants.'
     }
   };
 
   const fd = fieldDescriptions[fieldType];
   const isGerman = language === 'de';
+  const charLimit = 3000;
 
-  // VARIANTE 1: Buffer for German text so English translation doesn't exceed EU limits
-  const targetChars = isGerman ? Math.round(fd.charLimit * 0.80) : Math.round(fd.charLimit * 0.90);
-  const minChars = isGerman ? Math.round(fd.charLimit * 0.70) : Math.round(fd.charLimit * 0.80);
+  // Buffer for German text so English translation doesn't exceed EU limits
+  const targetChars = isGerman ? Math.round(charLimit * 0.80) : Math.round(charLimit * 0.90);
+  const minChars = isGerman ? Math.round(charLimit * 0.70) : Math.round(charLimit * 0.80);
   const targetWords = Math.round(targetChars / 7);
   const minWords = Math.round(minChars / 7);
 
   // Include cross-step context for coherent activities
   const stepContext = buildStepContext(state, 6);
 
+  // Get the WP configuration to know which activities are planned
+  const wpConfig = state.wpConfigurations?.find(w => w.wpNumber === wpIndex);
+  const activitiesInfo = wpConfig?.selectedActivities?.length
+    ? `Geplante Aktivitäten in diesem WP: ${wpConfig.selectedActivities.join(', ')}`
+    : '';
+
   const prompt = `Du bist ein erfahrener Erasmus+ Antragsberater.
 
-AUFGABE: Generiere das Feld "${fd.label}" für alle 3 Aktivitäten von Work Package ${wpIndex}: "${wpTitle}".
+AUFGABE: Beantworte die folgende Frage für Work Package ${wpIndex}: "${wpTitle}".
+Die Antwort soll ALLE Aktivitäten dieses Work Packages abdecken.
 
 PROJEKT-KONTEXT:
 Projektidee: ${state.idea.shortDescription || 'Bildungsprojekt'}
@@ -2456,84 +2460,35 @@ Zielgruppen: ${state.idea.targetGroups?.join(', ') || 'Jugendliche, Erwachsene'}
 Partner:
 ${partnerList}
 ${stepContext}
-FRAGE FÜR JEDE AKTIVITÄT:
+${activitiesInfo}
+
+FRAGE (OFFIZIELLE EU-FRAGE):
 ${fd.question}
 
 REGELN:
-- Jeder Text MUSS ca. ${targetWords} Wörter umfassen (+/- 10-15%). 
-- Absolutes MINIMUM: ${minWords} Wörter (${minChars} Zeichen) pro Aktivität!
-- Nutze **fett** für wichtige Begriffe und Überschriften
-- Nutze - für Aufzählungen
-- Jede Aktivität muss UNTERSCHIEDLICH sein (verschiedene Schwerpunkte!)
-- Schreibe auf ${langName}
-- Nenne konkrete Zahlen, Tools, Methoden und Zielgruppen
-- KI-Modelle verschätzen sich bei Zeichen. Bitte halte dich zwingend an die Wortanzahl!
+- Der Text MUSS ca. ${targetWords} Wörter umfassen (+/- 10-15%).
+- Absolutes MINIMUM: ${minWords} Wörter (${minChars} Zeichen)!
+- Beschreibe ALLE Aktivitäten des WP in einem zusammenhängenden Text.
+- Strukturiere den Text mit **fetten Überschriften** pro Aktivität.
+- Nutze - für Aufzählungen.
+- Schreibe auf ${langName}.
+- Nenne konkrete Zahlen, Tools, Methoden und Zielgruppen.
+- Beziehe dich explizit auf die Partner und deren Rollen.
 
-Antworte NUR mit einem validen JSON-Objekt:
-{
-  "activity_1": "Ausführlicher Text für Aktivität 1 (ca. ${targetWords} Wörter)...",
-  "activity_2": "Ausführlicher Text für Aktivität 2 (ca. ${targetWords} Wörter)...",
-  "activity_3": "Ausführlicher Text für Aktivität 3 (ca. ${targetWords} Wörter)..."
-}`;
+Antworte NUR mit dem Text (KEINE JSON-Formatierung, KEINE Einleitung wie "Hier ist...").`;
 
-  const systemContext = `Du bist EU-Projektexperte für Erasmus+ Anträge. Generiere Aktivitätsbeschreibungen im JSON-Format. Jedes Feld muss substantiell, konkret und ausführlich sein. NIEMALS unter ${minWords} Wörtern pro Aktivität. Antworte NUR mit validem JSON.`;
+  const systemContext = `Du bist EU-Projektexperte für Erasmus+ Anträge. Generiere einen umfassenden, zusammenhängenden Text der alle Aktivitäten des Work Packages abdeckt. NIEMALS unter ${minWords} Wörtern.`;
 
   const response = await callGeminiForPipeline(prompt, systemContext, 0.7);
 
-  // Parse JSON from response — handle control characters that Gemini often includes
-  let cleanJson = response.replace(/```json/g, '').replace(/```/g, '').replace(/^["']|["']$/g, '').trim();
+  // Clean up the response - remove markdown code fences if present
+  let cleanResponse = response.replace(/```\w*/g, '').replace(/```/g, '').trim();
 
-  // Remove bad control characters inside JSON string values (common Gemini issue)
-  // Replace actual newlines/tabs inside strings with escaped versions
-  // Strategy: find the JSON object boundaries, then sanitize control chars
-  const jsonStart = cleanJson.indexOf('{');
-  const jsonEnd = cleanJson.lastIndexOf('}');
-  if (jsonStart !== -1 && jsonEnd !== -1) {
-    cleanJson = cleanJson.substring(jsonStart, jsonEnd + 1);
-  }
-
-  // Replace control characters (0x00-0x1F except already-escaped ones) that break JSON.parse
-  // This handles raw newlines, tabs, carriage returns inside string values
-  cleanJson = cleanJson.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' '); // Remove most control chars
-  cleanJson = cleanJson.replace(/\t/g, ' '); // Replace tabs with spaces
-  // Handle unescaped newlines inside JSON string values by replacing them with \\n
-  // First pass: replace \r\n and \r with \n
-  cleanJson = cleanJson.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  // Now fix newlines that are inside string values (between quotes)
-  // We need to be careful not to break the JSON structure
-  cleanJson = cleanJson.replace(/"([^"]*?)"/g, (match) => {
-    // Inside each quoted string, replace raw newlines with escaped \\n
-    return match.replace(/\n/g, '\\n');
-  });
-
-  let parsed: any;
-  try {
-    parsed = JSON.parse(cleanJson);
-  } catch (parseError) {
-    // Fallback: try even more aggressive cleanup
-    console.warn(`[generateActivitiesFieldBundled] First JSON parse failed, trying aggressive cleanup...`);
-    // Remove ALL control characters and try again
-    const aggressiveClean = cleanJson.replace(/[\x00-\x1F]/g, ' ').replace(/\s{2,}/g, ' ');
-    parsed = JSON.parse(aggressiveClean);
-  }
-
-  // Map field name to answer key suffix
-  const fieldKeyMap: Record<string, string> = {
-    content: 'content',
-    objectives: 'objectives',
-    results: 'results',
-    participants: 'participants'
-  };
-
-  const keyPart = fieldKeyMap[fieldType];
-
-  // Map to answer keys matching the pipeline structure format
+  // Map to the single consolidated answer key
   const results: Record<string, string> = {};
-  results[`wp_act1_${keyPart}_wp${wpIndex}`] = parsed.activity_1 || '';
-  results[`wp_act2_${keyPart}_wp${wpIndex}`] = parsed.activity_2 || '';
-  results[`wp_act3_${keyPart}_wp${wpIndex}`] = parsed.activity_3 || '';
+  results[`wp_act_${fieldType}_wp${wpIndex}`] = cleanResponse;
 
-  console.log(`[generateActivitiesFieldBundled] WP${wpIndex} ${fieldType}: act1=${(parsed.activity_1 || '').length}c, act2=${(parsed.activity_2 || '').length}c, act3=${(parsed.activity_3 || '').length}c`);
+  console.log(`[generateActivitiesFieldBundled] WP${wpIndex} ${fieldType}: ${cleanResponse.length}c (consolidated)`);
 
   return results;
 }
@@ -2546,7 +2501,7 @@ export async function generateSingleActivity(
   language: string,
   instruction?: string
 ): Promise<{ wp: WorkPackage; newAnswers: Record<string, string> }> {
-  console.log(`[generateSingleActivity] Generating WP${wpIndex} Activity ${actNum}...`);
+  console.log(`[generateSingleActivity] Regenerating activities for WP${wpIndex}...`);
 
   const langName = language === 'de' ? 'Deutsch' : 'English';
   const wpTitle = state.workPackages?.find(w => w.number === wpIndex)?.title || `Work Package ${wpIndex}`;
@@ -2556,70 +2511,23 @@ export async function generateSingleActivity(
     `- ${p.name} (${p.country}, ${p.type}): ${p.expertise?.join(', ') || 'N/A'}`
   ).join('\n');
 
-  // Get previous answers for context if this is a regeneration
-  const prevContent = state.answers?.[`wp_act${actNum}_content_wp${wpIndex}`] || '';
+  // Get previous content for context if this is a regeneration
+  const prevContent = state.answers?.[`wp_act_content_wp${wpIndex}`] || '';
   const prevContextText = prevContent ? `\n\nBISHERIGER INHALT:\n${prevContent}\nBAUE DARAUF AUF ODER VERBESSERE IHN.` : '';
 
-  const prompt = `Du bist ein erfahrener Erasmus+ Antragsberater.
+  // Regenerate all 4 activity fields for this WP using the bundled generator
+  const fields = ['content', 'objectives', 'results', 'participants'] as const;
+  const newAnswers: Record<string, string> = {};
 
-AUFGABE: Generiere detaillierte Inhalte für EINE SPEZIFISCHE AKTIVITÄT (Aktivität ${actNum}) in Work Package ${wpIndex}: "${wpTitle}".
-
-=== PROJEKT KONTEXT ===
-Projekttitel: ${state.projectTitle || 'N/A'}
-Akronym: ${state.acronym || 'N/A'}
-Aktionstyp: ${state.configuration?.actionType}
-Sektor: ${state.idea.sector}
-Zielgruppen: ${state.idea.targetGroups?.join(', ') || 'N/A'}
-Partner:
-${partnerList}
-${stepContext}
-${prevContextText}
-${instruction ? `\n🎯 BENUTZER-ANWEISUNG (FOLGE DIESER SONDERAUSFÜHRUNG!):\n${instruction}\n` : ''}
-
-REGELN:
-- Generiere 4 spezifische Felder für DIESE EINE Aktivität.
-- Nutze **fett** für wichtige Begriffe und - für Aufzählungen.
-- Schreibe auf ${langName}.
-- Sei sehr ausführlich und beziehe dich auf konkrete Partner und Ziele.
-
-Antworte NUR mit validem JSON-Objekt:
-{
-  "content": "Ausführlicher Inhalt/Content der Aktivität...",
-  "objectives": "Wie unterstützt diese Aktivität die Ziele...",
-  "results": "Konkrete erwartete Ergebnisse...",
-  "participants": "Wer nimmt teil (Anzahl und Profil)..."
-}`;
-
-  const systemContext = "Du bist EU-Projektexperte. Antworte NUR mit validem JSON.";
-  const response = await callGeminiForPipeline(prompt, systemContext, 0.7);
-
-  let cleanJson = response.replace(/```json/g, '').replace(/```/g, '').replace(/^["']|["']$/g, '').trim();
-  const jsonStart = cleanJson.indexOf('{');
-  const jsonEnd = cleanJson.lastIndexOf('}');
-  if (jsonStart !== -1 && jsonEnd !== -1) {
-    cleanJson = cleanJson.substring(jsonStart, jsonEnd + 1);
+  for (const field of fields) {
+    const fieldAnswers = await generateActivitiesFieldBundled(state, wpIndex, wpTitle, field, language);
+    Object.assign(newAnswers, fieldAnswers);
+    if (field !== 'participants') {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
   }
 
-  cleanJson = cleanJson.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ').replace(/\t/g, ' ');
-  cleanJson = cleanJson.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  cleanJson = cleanJson.replace(/"([^"]*?)"/g, match => match.replace(/\n/g, '\\n'));
-
-  let parsed: any;
-  try {
-    parsed = JSON.parse(cleanJson);
-  } catch (e) {
-    const aggressiveClean = cleanJson.replace(/[\x00-\x1F]/g, ' ').replace(/\s{2,}/g, ' ');
-    parsed = JSON.parse(aggressiveClean);
-  }
-
-  const newAnswers = {
-    [`wp_act${actNum}_content_wp${wpIndex}`]: parsed.content || '',
-    [`wp_act${actNum}_objectives_wp${wpIndex}`]: parsed.objectives || '',
-    [`wp_act${actNum}_results_wp${wpIndex}`]: parsed.results || '',
-    [`wp_act${actNum}_participants_wp${wpIndex}`]: parsed.participants || ''
-  };
-
-  // Rebuild the WP object with these new answers merged into existing answers
+  // Rebuild the WP object with these new answers
   const allAnswers = { ...state.answers, ...newAnswers };
 
   const existingWp = state.workPackages?.find(w => w.number === wpIndex);
@@ -2627,27 +2535,23 @@ Antworte NUR mit validem JSON-Objekt:
     throw new Error(`Work Package ${wpIndex} not found in state.`);
   }
 
+  const wpConfig = state.wpConfigurations?.find(w => w.wpNumber === wpIndex);
+  const actContent = allAnswers[`wp_act_content_wp${wpIndex}`];
+
   const updatedWp: WorkPackage = {
     ...existingWp,
-    activities: [1, 2, 3]
-      .map((aNum) => {
-        const actContent = allAnswers[`wp_act${aNum}_content_wp${wpIndex}`];
-        if (!actContent) return null;
-
-        return {
-          id: `wp${wpIndex}-act${aNum}`,
-          title: `Activity ${wpIndex}.${aNum}`,
-          content: actContent,
-          objectivesAlignment: allAnswers[`wp_act${aNum}_objectives_wp${wpIndex}`] || '',
-          expectedResults: allAnswers[`wp_act${aNum}_results_wp${wpIndex}`] || '',
-          participants: allAnswers[`wp_act${aNum}_participants_wp${wpIndex}`] || '',
-          description: actContent,
-          month: { start: 1 + (aNum - 1) * 4, end: 6 + (aNum - 1) * 4 },
-          type: 'Event',
-          leader: state.consortium[0]?.id || ''
-        } as Activity;
-      })
-      .filter((a): a is Activity => a !== null)
+    activities: actContent ? [{
+      id: `wp${wpIndex}-activities`,
+      title: `Activities WP${wpIndex}`,
+      content: actContent,
+      objectivesAlignment: allAnswers[`wp_act_objectives_wp${wpIndex}`] || '',
+      expectedResults: allAnswers[`wp_act_results_wp${wpIndex}`] || '',
+      participants: allAnswers[`wp_act_participants_wp${wpIndex}`] || '',
+      description: actContent,
+      month: wpConfig?.duration || { start: 1, end: 24 },
+      type: 'Event',
+      leader: state.consortium[0]?.id || ''
+    } as Activity] : []
   };
 
   return { wp: updatedWp, newAnswers };
@@ -2679,12 +2583,12 @@ async function generateSingleWP(state: PipelineState, wpIndex: number, language:
   let wpAnswers = await generateSectionAnswers(state, sectionId, 6, language, wpContext);
   console.log(`[generateSingleWP] WP${wpIndex} main answers:`, Object.keys(wpAnswers));
 
-  // STEP 2: Generate Activities section (3 activities × 4 fields)
+  // STEP 2: Generate Activities section (4 consolidated fields)
   // WP1 (Management) has no activities — skip for WP1
-  // Bundled: 4 API calls (1 per field) instead of 12 (1 per question)
+  // 4 API calls: 1 per field (content, objectives, results, participants)
   let activitiesAnswers: Record<string, string> = {};
   if (!isManagement) {
-    console.log(`[generateSingleWP] Generating activities for WP${wpIndex} (bundled: 4 calls instead of 12)...`);
+    console.log(`[generateSingleWP] Generating activities for WP${wpIndex} (4 consolidated fields)...`);
 
     const fields = ['content', 'objectives', 'results', 'participants'] as const;
     for (const field of fields) {
@@ -2698,10 +2602,7 @@ async function generateSingleWP(state: PipelineState, wpIndex: number, language:
         }
       } catch (e: any) {
         console.error(`[generateSingleWP] Activities ${field} failed:`, e.message);
-        // Set empty answers for this field across all 3 activities
-        for (let actNum = 1; actNum <= 3; actNum++) {
-          activitiesAnswers[`wp_act${actNum}_${field}_wp${wpIndex}`] = '';
-        }
+        activitiesAnswers[`wp_act_${field}_wp${wpIndex}`] = '';
       }
     }
     console.log(`[generateSingleWP] WP${wpIndex} activities complete:`, Object.keys(activitiesAnswers).length, 'fields');
@@ -2725,41 +2626,26 @@ async function generateSingleWP(state: PipelineState, wpIndex: number, language:
     budget: 0
   };
 
-  // Build activities from generated answers (new 4-question format)
-  // For each activity (1-3), we now have 4 sub-questions: content, objectives, results, participants
-  wp.activities = [1, 2, 3]
-    .map((actNum) => {
-      // Check if this activity has content (at minimum the content field)
-      const contentKey = `wp_act${actNum}_content_wp${wpIndex}`;
-      const actContent = allAnswers[contentKey];
-
-      // Skip if no content was generated
-      if (!actContent) return null;
-
-      // Get all 4 sub-question answers
-      const objectivesKey = `wp_act${actNum}_objectives_wp${wpIndex}`;
-      const resultsKey = `wp_act${actNum}_results_wp${wpIndex}`;
-      const participantsKey = `wp_act${actNum}_participants_wp${wpIndex}`;
-
-      const activity: Activity = {
-        id: `wp${wpIndex}-act${actNum}`,
-        title: `Activity ${wpIndex}.${actNum}`,
-        // Detailed 4-point description (new format)
+  // Build activities from consolidated answers (4 fields covering all activities)
+  if (!isManagement) {
+    const actContent = allAnswers[`wp_act_content_wp${wpIndex}`];
+    if (actContent) {
+      wp.activities = [{
+        id: `wp${wpIndex}-activities`,
+        title: `Activities WP${wpIndex}`,
         content: actContent,
-        objectivesAlignment: allAnswers[objectivesKey] || '',
-        expectedResults: allAnswers[resultsKey] || '',
-        participants: allAnswers[participantsKey] || '',
-        // Combined description for legacy/summary purposes
+        objectivesAlignment: allAnswers[`wp_act_objectives_wp${wpIndex}`] || '',
+        expectedResults: allAnswers[`wp_act_results_wp${wpIndex}`] || '',
+        participants: allAnswers[`wp_act_participants_wp${wpIndex}`] || '',
         description: actContent,
-        month: { start: 1 + (actNum - 1) * 4, end: 6 + (actNum - 1) * 4 },
+        month: wpConfig?.duration || { start: 1, end: 24 },
         type: 'Event',
         leader: wpConfig?.leadPartnerId || state.consortium[0]?.id || ''
-      };
-      return activity;
-    })
-    .filter((a): a is Activity => a !== null);
+      } as Activity];
+    }
+  }
 
-  console.log(`[generateSingleWP] WP${wpIndex} complete with ${wp.activities.length} activities`);
+  console.log(`[generateSingleWP] WP${wpIndex} complete`);
 
   return { wp, answers: allAnswers };
 }

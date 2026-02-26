@@ -387,51 +387,44 @@ export const getOfficialPipelineStructure = (actionType: 'KA220' | 'KA210' = 'KA
       ]
     });
 
-    // Add Activities section for each WP (WP2-5 have detailed 4-question format)
-    // Each activity has 4 official Erasmus+ sub-questions
-    const activityQuestions: PipelineQuestion[] = [];
-
-    for (let actNum = 1; actNum <= 3; actNum++) {
-      activityQuestions.push(
-        {
-          id: `wp_act${actNum}_content_wp${i}`,
-          text: `Activity ${actNum}: Content`,
-          fullQuestion: `Describe the content of the proposed activities.`,
-          type: 'textarea' as const,
-          required: actNum === 1,
-          charLimit: 1500
-        },
-        {
-          id: `wp_act${actNum}_objectives_wp${i}`,
-          text: `Activity ${actNum}: Objectives`,
-          fullQuestion: `Explain how these activities are going to help reach the WP objectives.`,
-          type: 'textarea' as const,
-          required: actNum === 1,
-          charLimit: 1000
-        },
-        {
-          id: `wp_act${actNum}_results_wp${i}`,
-          text: `Activity ${actNum}: Expected Results`,
-          fullQuestion: `Describe the expected results of the activities.`,
-          type: 'textarea' as const,
-          required: actNum === 1,
-          charLimit: 1000
-        },
-        {
-          id: `wp_act${actNum}_participants_wp${i}`,
-          text: `Activity ${actNum}: Participants`,
-          fullQuestion: `Expected number and profile of participants.`,
-          type: 'textarea' as const,
-          required: actNum === 1,
-          charLimit: 800
-        }
-      );
-    }
-
+    // Add Activities section for each WP - 4 official EU questions covering ALL activities
     wpSections.push({
       id: `wp_activities_wp${i}`,
       title: `WP${i}: Description of Activities`,
-      questions: activityQuestions
+      questions: [
+        {
+          id: `wp_act_content_wp${i}`,
+          text: 'Activities: Content',
+          fullQuestion: 'Describe the content of the proposed activities.',
+          type: 'textarea' as const,
+          required: true,
+          charLimit: 3000
+        },
+        {
+          id: `wp_act_objectives_wp${i}`,
+          text: 'Activities: Objectives',
+          fullQuestion: 'Explain how these activities are going to help reach the WP objectives.',
+          type: 'textarea' as const,
+          required: true,
+          charLimit: 3000
+        },
+        {
+          id: `wp_act_results_wp${i}`,
+          text: 'Activities: Expected Results',
+          fullQuestion: 'Describe the expected results of the activities.',
+          type: 'textarea' as const,
+          required: true,
+          charLimit: 3000
+        },
+        {
+          id: `wp_act_participants_wp${i}`,
+          text: 'Activities: Participants',
+          fullQuestion: 'Expected number and profile of participants.',
+          type: 'textarea' as const,
+          required: true,
+          charLimit: 3000
+        }
+      ]
     });
   }
 
