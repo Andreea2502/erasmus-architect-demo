@@ -23,17 +23,44 @@ export async function POST(req: Request) {
         // actually, as an evaluator, we SHOULD penalize missing sections because it means the proposal is incomplete.
         let fullApplicationText = '';
 
+        // Helper: extract answer value from raw string or {value: string} object
+        const getAnswerText = (key: string): string => {
+            const answer = state.answers[key];
+            if (!answer) return '';
+            if (typeof answer === 'string') return answer;
+            if (typeof answer === 'object' && 'value' in answer && typeof (answer as any).value === 'string') return (answer as any).value;
+            return '';
+        };
+
         // Build a readable document out of the structure + answers
         structure.forEach(chapter => {
             fullApplicationText += `\n\n# Chapter ${chapter.id}: ${chapter.title}\n`;
             chapter.sections.forEach(section => {
                 fullApplicationText += `\n## Section: ${section.title}\n`;
                 section.questions.forEach(q => {
-                    const answer = state.answers[q.id];
-                    if (answer) {
-                        fullApplicationText += `\n**Q: ${q.fullQuestion}**\n${answer}\n`;
+                    if (q.type === 'info' || q.type === 'select' || q.type === 'multiselect' || q.type === 'number') return;
+
+                    // For partner-specific questions (Chapter 2), look up with partnerId suffix
+                    if (chapter.id === 2) {
+                        // Try all possible partner answer keys
+                        const partnerKeys = Object.keys(state.answers).filter(k => k.startsWith(q.id + '_'));
+                        if (partnerKeys.length > 0) {
+                            partnerKeys.forEach(pk => {
+                                const answerText = getAnswerText(pk);
+                                if (answerText) {
+                                    fullApplicationText += `\n**Q: ${q.fullQuestion}**\n${answerText}\n`;
+                                }
+                            });
+                        } else {
+                            fullApplicationText += `\n**Q: ${q.fullQuestion}**\n[NOT ANSWERED]\n`;
+                        }
                     } else {
-                        fullApplicationText += `\n**Q: ${q.fullQuestion}**\n[NOT ANSWERED]\n`;
+                        const answerText = getAnswerText(q.id);
+                        if (answerText) {
+                            fullApplicationText += `\n**Q: ${q.fullQuestion}**\n${answerText}\n`;
+                        } else {
+                            fullApplicationText += `\n**Q: ${q.fullQuestion}**\n[NOT ANSWERED]\n`;
+                        }
                     }
                 });
             });

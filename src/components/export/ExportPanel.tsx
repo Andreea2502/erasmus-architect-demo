@@ -28,6 +28,8 @@ import {
   Languages,
   ChevronDown,
   ChevronUp,
+  Paperclip,
+  ExternalLink,
 } from "lucide-react";
 
 type ExportFormat = "json" | "word" | "summary" | "pdf";
@@ -106,6 +108,13 @@ export function ExportPanel() {
   const [translateProgress, setTranslateProgress] = useState({ current: 0, total: 0 });
   const [translatedAnswers, setTranslatedAnswers] = useState<Record<string, string>>({});
   const [showTranslated, setShowTranslated] = useState(false);
+  const [attachmentsChecked, setAttachmentsChecked] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('erasmus-attachments');
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const project = projects.find((p) => p.id === selectedProject);
@@ -340,19 +349,35 @@ export function ExportPanel() {
       if (!text.trim()) continue;
 
       try {
-        const res = await fetch('/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, targetLanguage: 'en', context: project.actionType }),
-        });
-        const data = await res.json();
-        if (data.translatedText) {
+        // Retry logic for rate limiting
+        let retries = 0;
+        let data: any = null;
+        while (retries < 2) {
+          const res = await fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, targetLanguage: 'en', context: project.actionType }),
+          });
+          if (res.status === 429) {
+            retries++;
+            await new Promise(r => setTimeout(r, 3000 * retries));
+            continue;
+          }
+          data = await res.json();
+          break;
+        }
+        if (data?.translatedText) {
           translated[key] = data.translatedText;
         }
       } catch (err) {
         console.error(`Translation failed for ${key}:`, err);
       }
       setTranslateProgress({ current: i + 1, total: keys.length });
+
+      // Rate limiting delay: 1.5s between calls
+      if (i < keys.length - 1) {
+        await new Promise(r => setTimeout(r, 1500));
+      }
     }
 
     setTranslatedAnswers(translated);
@@ -888,6 +913,17 @@ export function ExportPanel() {
             )}
           </div>
 
+          {/* Generator Link */}
+          {selectedProject && (
+            <a
+              href={`/generator?project=${selectedProject}`}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-[#003399] text-[#003399] rounded-xl hover:bg-blue-50 transition-colors font-medium text-sm"
+            >
+              <ExternalLink size={16} />
+              Im Generator bearbeiten
+            </a>
+          )}
+
           {/* Format Selection */}
           <div className="bg-white rounded-xl border p-4">
             <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -1001,6 +1037,51 @@ export function ExportPanel() {
                 <><Languages size={16} /> Ins Englische übersetzen</>
               )}
             </button>
+          </div>
+
+          {/* EU Attachments Checklist */}
+          <div className="bg-white rounded-xl border p-4">
+            <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Paperclip size={18} />
+              Pflicht-Anhänge (EU)
+            </h2>
+            <p className="text-xs text-gray-500 mb-3">
+              Checkliste der benötigten Dokumente für die Einreichung.
+            </p>
+            <div className="space-y-2">
+              {[
+                { id: 'mandate', label: 'Mandate Letters', desc: 'Von jedem Partner unterschrieben' },
+                { id: 'declaration', label: 'Declaration of Honour', desc: 'Vom Koordinator unterschrieben' },
+                { id: 'budget', label: 'Budget Annex', desc: 'Detaillierte Budgetaufstellung' },
+                { id: 'timetable', label: 'Project Timetable', desc: 'Gantt-Chart / Zeitplan' },
+                { id: 'legal_entity', label: 'Legal Entity Forms', desc: 'Für jede Organisation' },
+                { id: 'financial_id', label: 'Financial Identification', desc: 'Bankdaten des Koordinators' },
+                { id: 'supporting_docs', label: 'Supporting Documents', desc: 'Studien, LOIs, CVs etc.' },
+              ].map(att => {
+                const checkKey = `${selectedProject}_${att.id}`;
+                return (
+                  <label key={att.id} className="flex items-start gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={attachmentsChecked[checkKey] || false}
+                      onChange={(e) => {
+                        const updated = { ...attachmentsChecked, [checkKey]: e.target.checked };
+                        setAttachmentsChecked(updated);
+                        localStorage.setItem('erasmus-attachments', JSON.stringify(updated));
+                      }}
+                      className="mt-1 rounded border-gray-300 text-[#003399] focus:ring-[#003399]"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-gray-800">{att.label}</div>
+                      <div className="text-xs text-gray-500">{att.desc}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="mt-3 text-xs text-gray-400 text-center">
+              {Object.keys(attachmentsChecked).filter(k => k.startsWith(selectedProject + '_') && attachmentsChecked[k]).length} / 7 erledigt
+            </div>
           </div>
         </div>
 
