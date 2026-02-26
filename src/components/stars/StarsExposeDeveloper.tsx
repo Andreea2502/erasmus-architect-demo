@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Star, FileText, BookOpen, Users, Layers, Rocket,
   ChevronLeft, ChevronRight, Save, ArrowRight, RefreshCw,
-  Check, CheckCircle2, FolderOpen, Trash2, ArrowRightLeft,
+  Check, CheckCircle2, FolderOpen, Trash2, ArrowRightLeft, Library,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/store/app-store';
@@ -52,6 +52,7 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
   const addProject = useAppStore(s => s.addProject);
   const updateProject = useAppStore(s => s.updateProject);
   const deleteProject = useAppStore(s => s.deleteProject);
+  const addSavedConcept = useAppStore(s => s.addSavedConcept);
 
   // STARS concept store
   const store = useStarsConceptStore();
@@ -304,6 +305,51 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
   }, [store, savedProjectId, addProject, updateProject, router]);
 
   // ============================================================================
+  // SAVE CONCEPT TO LIBRARY
+  // ============================================================================
+
+  const saveConceptToLibrary = useCallback(() => {
+    const selectedConcept = store.conceptProposals.find(c => c.id === store.selectedConceptId);
+    const title = store.projectTitle || selectedConcept?.title || 'STARS Projekt';
+    const acronym = store.projectAcronym || selectedConcept?.acronym || '';
+
+    addSavedConcept({
+      title,
+      acronym,
+      priority: store.priorityFocus || '',
+      problemStatement: store.challengeNarrative || store.problem,
+      innovation: selectedConcept?.innovation || store.projectResponse || '',
+      detailedConcept: store.fullExpose || undefined,
+      workPackages: [],
+      mainOutputs: selectedConcept?.mainOutputs || [],
+      expectedImpact: '',
+      consortiumFit: store.partnershipNarrative || '',
+      duration: store.duration,
+      status: 'DRAFT',
+      partnerIds: store.selectedPartners.map(sp => sp.partnerId),
+      initialIdea: store.idea,
+      sector: store.sector as any,
+      actionType: store.actionType as any,
+      conceptMode: 'stars',
+      starsData: {
+        challengeNarrative: store.challengeNarrative,
+        opportunityNarrative: store.opportunityNarrative,
+        projectResponse: store.projectResponse,
+        goals: store.goals,
+        starsTargetGroups: store.starsTargetGroups,
+        methodPrinciples: store.methodPrinciples,
+        partnershipNarrative: store.partnershipNarrative,
+        associatedPartners: store.associatedPartners,
+        euPolicyAlignment: store.euPolicyAlignment,
+        fullExpose: store.fullExpose || '',
+      },
+    });
+
+    setSaveMessage('Konzept in Bibliothek gespeichert!');
+    setTimeout(() => setSaveMessage(null), 3000);
+  }, [store, addSavedConcept]);
+
+  // ============================================================================
   // DERIVED
   // ============================================================================
 
@@ -354,6 +400,15 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
             >
               <Save className="h-4 w-4 mr-2" />
               Speichern
+            </Button>
+            <Button
+              onClick={saveConceptToLibrary}
+              disabled={!store.selectedConceptId}
+              variant="outline"
+              className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300"
+            >
+              <Library className="h-4 w-4 mr-2" />
+              In Bibliothek
             </Button>
             <Button
               variant="outline"
@@ -549,6 +604,17 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
               <Save className="h-4 w-4 mr-2" />
               Speichern
             </Button>
+            {store.selectedConceptId && (
+              <Button
+                variant="outline"
+                onClick={saveConceptToLibrary}
+                className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                size="sm"
+              >
+                <Library className="h-3.5 w-3.5 mr-1.5" />
+                Bibliothek
+              </Button>
+            )}
             <span className="text-sm text-gray-400">
               Schritt {currentStep} von {STEPS.length}
             </span>

@@ -474,13 +474,15 @@ Antworte im JSON-Format:
             // Use projectResponse field from store for innovation -- or derive from idea
             const innovation = store.additionalInstructions || ideaText;
             const partnershipFacts = getPartnershipFacts();
+            const sourceContext = buildSourceContext(store.sources);
 
             const prompt = getProjectResponsePrompt(
                 store.challengeNarrative,
                 store.opportunityNarrative,
                 ideaText,
                 innovation,
-                partnershipFacts
+                partnershipFacts,
+                sourceContext
             );
 
             const response = await generateContentAction(prompt, NARRATIVE_SYSTEM, 0.7, 60000);
@@ -555,13 +557,15 @@ Antworte im JSON-Format:
         try {
             const ideaText = store.enhancedIdea || store.idea;
             const partnershipFacts = getPartnershipFacts();
+            const sourceContext = buildSourceContext(store.sources);
 
             const prompt = getStarsTargetGroupsPrompt(
                 store.targetGroup,
                 ideaText,
                 store.sector,
                 store.challengeNarrative,
-                partnershipFacts
+                partnershipFacts,
+                sourceContext
             );
 
             const response = await generateJsonContentAction(prompt, JSON_SYSTEM, 0.5);
@@ -603,13 +607,15 @@ Antworte im JSON-Format:
                 .join('\n');
             const innovation = store.additionalInstructions || ideaText;
             const partnershipFacts = getPartnershipFacts();
+            const sourceContext = buildSourceContext(store.sources);
 
             const prompt = getStarsMethodologyPrompt(
                 ideaText,
                 goalsText,
                 innovation,
                 store.sector,
-                partnershipFacts
+                partnershipFacts,
+                sourceContext
             );
 
             const response = await generateJsonContentAction(prompt, JSON_SYSTEM, 0.5);

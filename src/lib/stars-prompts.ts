@@ -37,6 +37,7 @@ LANGUAGE AND QUALITY RULES (apply to EVERY sentence you write):
 - Every claim must be backed by a CONCRETE mechanism, number, or source reference.
 - Write in professional, essay-like academic prose. No marketing language.
 - When citing data, always include: author/institution, report title, and year.
+- When research sources are provided, you MUST actively reference them in your text. Cite them by their title and key findings. Do NOT ignore uploaded research sources — they are the evidentiary backbone of the proposal.
 `.trim();
 
 // ============================================================================
@@ -471,7 +472,8 @@ export function getProjectResponsePrompt(
   opportunityText: string,
   projectIdea: string,
   innovation: string,
-  partnershipFacts?: string
+  partnershipFacts?: string,
+  sourceContext?: string
 ): string {
   return `You are an expert Erasmus+ proposal writer crafting Section 3.3 "The Project Response."
 
@@ -488,6 +490,10 @@ THE PROJECT IDEA:
 
 INNOVATION / UNIQUE APPROACH:
 "${innovation}"
+
+RESEARCH EVIDENCE AND SOURCES:
+${sourceContext || '(no research sources uploaded)'}
+When describing the project's activities and outputs, reference findings from the uploaded research sources to justify WHY each action pillar is needed. Cite sources by title.
 
 TASK: Write a project response section that has two parts:
 
@@ -610,7 +616,8 @@ export function getStarsTargetGroupsPrompt(
   projectIdea: string,
   sector: string,
   challengeText: string,
-  partnershipFacts?: string
+  partnershipFacts?: string,
+  sourceContext?: string
 ): string {
   return `You are an expert Erasmus+ proposal writer defining target groups for a project in the ${sector} sector.
 
@@ -624,6 +631,10 @@ PROJECT IDEA:
 
 THE CHALLENGE CONTEXT:
 ${challengeText}
+
+RESEARCH EVIDENCE AND SOURCES:
+${sourceContext || '(no research sources uploaded)'}
+Use data from the uploaded sources to substantiate target group characteristics, needs, and estimated reach numbers. Cite sources by title when referencing statistics or demographics.
 
 TASK: Define exactly 4 target groups in a hierarchical impact model. The hierarchy represents concentric circles of impact, from those directly engaged in project activities to those reached through systemic ripple effects.
 
@@ -712,7 +723,8 @@ export function getStarsMethodologyPrompt(
   goals: string,
   innovation: string,
   sector: string,
-  partnershipFacts?: string
+  partnershipFacts?: string,
+  sourceContext?: string
 ): string {
   return `You are an expert Erasmus+ methodologist designing the methodological framework for a project in the ${sector} sector.
 
@@ -726,6 +738,10 @@ ${goals}
 
 INNOVATION / UNIQUE APPROACH:
 "${innovation}"
+
+RESEARCH EVIDENCE AND SOURCES:
+${sourceContext || '(no research sources uploaded)'}
+Ground your methodological principles in evidence from the uploaded sources. Reference specific findings, frameworks, or best practices documented in the research. Cite sources by title.
 
 TASK: Define 4-6 named methodological principles that form the project's intervention framework. These are NOT work packages or activities -- they are the underlying PRINCIPLES that guide how all project activities are designed and delivered.
 
