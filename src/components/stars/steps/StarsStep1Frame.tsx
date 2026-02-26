@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { getBedarfsanalysePrompt, getBestPracticesPrompt, SECTORS, ERASMUS_PRIORITIES } from '@/lib/concept-prompts';
 import { copyToClipboard } from '@/lib/concept-helpers';
-import { EU_POLICY_OPTIONS } from '@/types/stars-concept';
 import { StarsConceptStore } from '@/store/stars-concept-store';
 
 interface StarsStep1FrameProps {
@@ -29,15 +28,6 @@ export function StarsStep1Frame({
 
     const generateResearchPrompts = () => {
         store.updateState({ researchPromptsGenerated: true });
-    };
-
-    const toggleEuPolicy = (policyId: string) => {
-        const current = store.euPolicyAlignment;
-        if (current.includes(policyId)) {
-            store.updateState({ euPolicyAlignment: current.filter(id => id !== policyId) });
-        } else {
-            store.updateState({ euPolicyAlignment: [...current, policyId] });
-        }
     };
 
     return (
@@ -188,59 +178,6 @@ export function StarsStep1Frame({
                     placeholder="z.B. Die meisten Erwachsenenbildner haben keine Ahnung von KI und trauen sich da nicht ran..."
                     className="min-h-[100px]"
                 />
-            </div>
-
-            {/* --- STARS-specific fields --- */}
-
-            {/* Project Title (EN) */}
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Projekttitel (EN)</label>
-                <Input
-                    value={store.projectTitle}
-                    onChange={e => store.updateState({ projectTitle: e.target.value })}
-                    placeholder="z.B. Empowering Adult Educators Through AI Literacy"
-                />
-            </div>
-
-            {/* Project Acronym (EN) */}
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Projekt-Akronym (EN)</label>
-                <Input
-                    value={store.projectAcronym}
-                    onChange={e => store.updateState({ projectAcronym: e.target.value })}
-                    placeholder="z.B. AI-EDUCATE"
-                />
-            </div>
-
-            {/* EU Policy Alignment */}
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">EU Policy Alignment</label>
-                <p className="text-xs text-gray-500 mb-3">
-                    Wähle die EU-Politikbereiche, die zum Projekt passen (Mehrfachauswahl möglich).
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {EU_POLICY_OPTIONS.map(option => {
-                        const isChecked = store.euPolicyAlignment.includes(option.id);
-                        return (
-                            <label
-                                key={option.id}
-                                className={`flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer transition-all text-sm ${
-                                    isChecked
-                                        ? 'border-indigo-400 bg-indigo-50 text-indigo-900'
-                                        : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50 text-gray-700'
-                                }`}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => toggleEuPolicy(option.id)}
-                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <span>{option.labelDE}</span>
-                            </label>
-                        );
-                    })}
-                </div>
             </div>
 
             {/* Enhance Button */}

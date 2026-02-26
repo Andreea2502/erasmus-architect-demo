@@ -74,11 +74,11 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
         return (
           store.idea.trim().length > 10 &&
           store.targetGroup.trim().length > 0 &&
-          store.problem.trim().length > 10 &&
-          store.projectTitle.trim().length > 0
+          store.problem.trim().length > 10
         );
       case 2:
-        return store.sources.length > 0;
+        // Must have selected a concept proposal
+        return store.selectedConceptId !== null;
       case 3:
         return store.selectedPartners.length > 0;
       case 4:
@@ -89,8 +89,8 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
         return true;
     }
   }, [
-    store.idea, store.targetGroup, store.problem, store.projectTitle,
-    store.sources, store.selectedPartners,
+    store.idea, store.targetGroup, store.problem,
+    store.selectedConceptId, store.selectedPartners,
     store.challengeNarrative, store.goals,
   ]);
 
@@ -99,8 +99,9 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
   // ============================================================================
 
   const saveDraft = useCallback(() => {
-    const draftTitle = store.projectTitle || store.projectAcronym || store.idea.substring(0, 60) || 'STARS Entwurf';
-    const draftAcronym = store.projectAcronym || '';
+    const selectedConcept = store.conceptProposals.find(c => c.id === store.selectedConceptId);
+    const draftTitle = store.projectTitle || selectedConcept?.title || store.idea.substring(0, 60) || 'STARS Entwurf';
+    const draftAcronym = store.projectAcronym || selectedConcept?.acronym || '';
 
     // Extract pure state for saving (exclude action methods)
     const { updateField, updateState, setCurrentStep, resetState, ...starsDevState } = store;
@@ -177,10 +178,11 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
     store.setCurrentStep(newStep);
 
     // Auto-save on step navigation if there is meaningful content
-    if (savedProjectId && (store.idea.trim() || store.projectTitle.trim())) {
+    if (savedProjectId && store.idea.trim()) {
       const { updateField, updateState, setCurrentStep, resetState, ...starsDevState } = store;
+      const selectedConcept = store.conceptProposals.find(c => c.id === store.selectedConceptId);
       updateProject(savedProjectId, {
-        title: store.projectTitle || store.projectAcronym || store.idea.substring(0, 60) || 'STARS Entwurf',
+        title: store.projectTitle || selectedConcept?.title || store.idea.substring(0, 60) || 'STARS Entwurf',
         conceptDeveloperState: {
           ...starsDevState,
           currentStep: newStep,
@@ -203,7 +205,7 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
     if (devState.idea?.trim()) dataPoints++;
     if (devState.targetGroup?.trim()) dataPoints++;
     if (devState.problem?.trim()) dataPoints++;
-    if (devState.projectTitle?.trim()) dataPoints++;
+    if (devState.selectedConceptId) dataPoints++;
     if (devState.sources?.length > 0) dataPoints++;
     if (devState.selectedPartners?.length > 0) dataPoints++;
     if (devState.challengeNarrative?.trim()) dataPoints++;
@@ -233,9 +235,12 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
   // ============================================================================
 
   const exportToPipeline = useCallback(() => {
+    const selectedConcept = store.conceptProposals.find(c => c.id === store.selectedConceptId);
+    const title = store.projectTitle || selectedConcept?.title || 'STARS Projekt';
+    const acronym = store.projectAcronym || selectedConcept?.acronym || '';
     const projectData: any = {
-      title: store.projectTitle || store.projectAcronym || 'STARS Projekt',
-      acronym: store.projectAcronym || '',
+      title,
+      acronym,
       status: 'DRAFT',
       actionType: store.actionType as any,
       sector: store.sector as any,
@@ -303,7 +308,7 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
   // ============================================================================
 
   const currentStep = store.currentStep;
-  const hasContent = store.idea.trim().length > 0 || store.projectTitle.trim().length > 0;
+  const hasContent = store.idea.trim().length > 0 || store.selectedConceptId !== null;
 
   // Filter drafts that are STARS mode
   const starsDrafts = projects.filter(
@@ -484,12 +489,14 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
           />
         )}
 
-        {/* ======================== STEP 2: RESEARCH & SOURCES ======================== */}
+        {/* ======================== STEP 2: RESEARCH & CONCEPTS ======================== */}
         {currentStep === 2 && (
           <StarsStep2Sources
             store={store}
             runAnalysis={generation.runAnalysis}
             handleFileUpload={generation.handleFileUpload}
+            generateConceptProposals={generation.generateConceptProposals}
+            selectConceptProposal={generation.selectConceptProposal}
           />
         )}
 

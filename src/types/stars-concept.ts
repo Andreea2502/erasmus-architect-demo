@@ -14,6 +14,22 @@
 import { ResearchSource, SelectedPartner } from './concept';
 
 // ============================================================================
+// STARS CONCEPT PROPOSAL (3 alternative concepts for user selection)
+// ============================================================================
+
+export interface StarsConceptProposal {
+    id: string;
+    title: string;           // English project title
+    acronym: string;         // Creative English acronym
+    summary: string;         // 3-5 sentences describing the approach
+    approach: string;        // Core intervention strategy
+    innovation: string;      // What's unique about this concept
+    mainOutputs: string[];   // Key deliverables
+    euPolicyAlignment: string[];  // Auto-detected EU policy areas
+    selected: boolean;
+}
+
+// ============================================================================
 // STARS-SPECIFIC DATA TYPES
 // ============================================================================
 
@@ -81,8 +97,13 @@ export interface StarsConceptState {
     projectAcronym: string;      // Final English acronym
     euPolicyAlignment: string[]; // e.g. ["Digital Transformation", "Social Economy"]
 
-    // Step 2: Research & Sources (reused from classic, without concept generation)
+    // Step 2: Research & Sources + Concept Proposals
     sources: ResearchSource[];
+    conceptProposals: StarsConceptProposal[];
+    selectedConceptId: string | null;
+    conceptsGenerated: boolean;
+    isGeneratingConcepts: boolean;
+    conceptError?: string;
 
     // Step 3: Partnership
     selectedPartners: SelectedPartner[];

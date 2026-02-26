@@ -36,8 +36,13 @@ export const initialStarsState: StarsConceptStoreState = {
     projectAcronym: '',
     euPolicyAlignment: [],
 
-    // Step 2: Research & Sources
+    // Step 2: Research & Sources + Concept Proposals
     sources: [],
+    conceptProposals: [],
+    selectedConceptId: null,
+    conceptsGenerated: false,
+    isGeneratingConcepts: false,
+    conceptError: undefined,
 
     // Step 3: Partnership
     selectedPartners: [],
@@ -94,6 +99,7 @@ export const useStarsConceptStore = create<StarsConceptStore>()(
             // Exclude loading states and transient errors from persistence
             partialize: (state) => ({
                 ...state,
+                isGeneratingConcepts: false,
                 isGeneratingPartnershipNarrative: false,
                 isGeneratingChallenge: false,
                 isGeneratingOpportunity: false,
@@ -104,6 +110,7 @@ export const useStarsConceptStore = create<StarsConceptStore>()(
                 isGeneratingExpose: false,
                 isTranslatingExpose: false,
                 // Clear errors on save
+                conceptError: undefined,
                 partnershipNarrativeError: undefined,
                 challengeError: undefined,
                 opportunityError: undefined,

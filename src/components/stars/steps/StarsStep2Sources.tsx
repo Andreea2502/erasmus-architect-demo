@@ -1,28 +1,83 @@
 import React, { useRef } from 'react';
 import {
     BookOpen, Upload, Plus, RefreshCw, AlertTriangle,
-    Sparkles, CheckCircle2, X, FileText
+    Sparkles, CheckCircle2, X, FileText, Star, Check,
+    ChevronDown, ChevronUp, Lightbulb, Zap, Network
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ResearchSource } from '@/types/concept';
+import { EU_POLICY_OPTIONS } from '@/types/stars-concept';
 import { StarsConceptStore } from '@/store/stars-concept-store';
+
+// ============================================================================
+// CONCEPT CARD COLORS
+// ============================================================================
+
+const CONCEPT_COLORS = [
+    {
+        gradient: 'from-blue-500 to-cyan-500',
+        border: 'border-blue-300',
+        borderSelected: 'border-blue-500',
+        bg: 'bg-blue-50',
+        bgSelected: 'bg-blue-50/70',
+        text: 'text-blue-700',
+        badge: 'bg-blue-100 text-blue-800',
+        icon: Lightbulb,
+        label: 'Kapazitatsaufbau',
+    },
+    {
+        gradient: 'from-purple-500 to-fuchsia-500',
+        border: 'border-purple-300',
+        borderSelected: 'border-purple-500',
+        bg: 'bg-purple-50',
+        bgSelected: 'bg-purple-50/70',
+        text: 'text-purple-700',
+        badge: 'bg-purple-100 text-purple-800',
+        icon: Zap,
+        label: 'Tool-/Ressourcen-Entwicklung',
+    },
+    {
+        gradient: 'from-emerald-500 to-teal-500',
+        border: 'border-emerald-300',
+        borderSelected: 'border-emerald-500',
+        bg: 'bg-emerald-50',
+        bgSelected: 'bg-emerald-50/70',
+        text: 'text-emerald-700',
+        badge: 'bg-emerald-100 text-emerald-800',
+        icon: Network,
+        label: 'Systemischer Wandel',
+    },
+];
+
+// ============================================================================
+// PROPS
+// ============================================================================
 
 interface StarsStep2SourcesProps {
     store: StarsConceptStore;
     runAnalysis: (sourceId: string) => Promise<void>;
     handleFileUpload: (files: FileList) => Promise<void>;
+    generateConceptProposals: () => Promise<void>;
+    selectConceptProposal: (conceptId: string) => void;
 }
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 export function StarsStep2Sources({
     store,
     runAnalysis,
     handleFileUpload,
+    generateConceptProposals,
+    selectConceptProposal,
 }: StarsStep2SourcesProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const dropZoneRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = React.useState(false);
+    const [expandedConceptId, setExpandedConceptId] = React.useState<string | null>(null);
 
     const addSourceManually = () => {
         const newSource: ResearchSource = {
@@ -74,19 +129,27 @@ export function StarsStep2Sources({
         (sum, s) => sum + (s.keyFindings?.length || 0), 0
     );
 
+    const toggleExpanded = (id: string) => {
+        setExpandedConceptId(prev => prev === id ? null : id);
+    };
+
+    const selectedConcept = store.conceptProposals.find(c => c.id === store.selectedConceptId);
+
     return (
         <div className="space-y-6">
             <div>
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4">
                     <BookOpen className="h-5 w-5 text-indigo-500" />
-                    Schritt 2: Quellen hochladen & analysieren
+                    Schritt 2: Recherche & Konzeptvorschlage
                 </h2>
                 <p className="text-sm text-gray-500 mb-6">
-                    Lade deine Recherche-Ergebnisse hoch und lass sie analysieren. Die Erkenntnisse fließen in das Exposé ein.
+                    Lade deine Recherche-Ergebnisse hoch, lass sie analysieren, und generiere dann 3 Konzeptvorschlage zur Auswahl.
                 </p>
             </div>
 
-            {/* Source Upload / Drop Zone */}
+            {/* ============================================================ */}
+            {/* SOURCE UPLOAD / DROP ZONE                                    */}
+            {/* ============================================================ */}
             <div
                 ref={dropZoneRef}
                 onDragOver={onDragOver}
@@ -120,7 +183,7 @@ export function StarsStep2Sources({
                         </label>
                         <Button variant="outline" size="sm" onClick={addSourceManually}>
                             <Plus className="h-4 w-4 mr-1" />
-                            Manuell hinzufügen
+                            Manuell
                         </Button>
                     </div>
                 </div>
@@ -135,7 +198,7 @@ export function StarsStep2Sources({
                 {store.sources.length === 0 && !isDragging ? (
                     <p className="text-sm text-gray-400 text-center py-4">
                         Noch keine Quellen. Lade deine Recherche-Ergebnisse als PDF, DOCX oder TXT hoch,
-                        oder füge sie manuell per Copy-Paste hinzu.
+                        oder fuge sie manuell per Copy-Paste hinzu.
                     </p>
                 ) : (
                     <div className="space-y-3">
@@ -195,7 +258,7 @@ export function StarsStep2Sources({
                                             <Textarea
                                                 value={source.content}
                                                 onChange={e => updateSource(source.id, { content: e.target.value })}
-                                                placeholder="Füge hier den Inhalt der Recherche ein (Copy-Paste)..."
+                                                placeholder="Fuge hier den Inhalt der Recherche ein (Copy-Paste)..."
                                                 className="min-h-[100px] text-sm"
                                             />
                                         )}
@@ -272,6 +335,236 @@ export function StarsStep2Sources({
                     </div>
                 </div>
             )}
+
+            {/* ============================================================ */}
+            {/* CONCEPT PROPOSALS SECTION                                    */}
+            {/* ============================================================ */}
+            <div className="pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                            <Star className="h-5 w-5 text-indigo-500" />
+                            Konzeptvorschlage
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Die KI generiert 3 verschiedene Konzeptansatze basierend auf deiner Idee und den Quellen. Wahle einen aus, um damit weiterzuarbeiten.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Generate Button */}
+                {!store.conceptsGenerated && !store.isGeneratingConcepts && (
+                    <Button
+                        onClick={generateConceptProposals}
+                        disabled={store.isGeneratingConcepts || !store.idea.trim()}
+                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white h-14 text-base"
+                    >
+                        <Sparkles className="h-5 w-5 mr-2" />
+                        3 Konzeptvorschlage generieren
+                    </Button>
+                )}
+
+                {/* Generating State */}
+                {store.isGeneratingConcepts && (
+                    <div className="flex flex-col items-center justify-center py-12 gap-3 bg-indigo-50/50 rounded-xl border border-indigo-200">
+                        <div className="relative">
+                            <Star className="h-10 w-10 text-indigo-500 animate-spin" />
+                        </div>
+                        <p className="text-lg font-medium text-indigo-700">
+                            Generiere 3 Konzeptvorschlage...
+                        </p>
+                        <p className="text-sm text-gray-500 text-center max-w-md">
+                            Die KI erstellt 3 verschiedene Ansatze: Kapazitatsaufbau, Tool-Entwicklung und systemischer Wandel (ca. 20-40s)
+                        </p>
+                    </div>
+                )}
+
+                {/* Error */}
+                {store.conceptError && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+                        <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
+                        <div className="flex-1">
+                            <p className="text-sm text-red-700">{store.conceptError}</p>
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={generateConceptProposals}
+                            className="bg-red-600 hover:bg-red-700 text-white shrink-0"
+                        >
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Erneut
+                        </Button>
+                    </div>
+                )}
+
+                {/* Concept Cards */}
+                {store.conceptsGenerated && store.conceptProposals.length > 0 && !store.isGeneratingConcepts && (
+                    <div className="space-y-4">
+                        <div className="space-y-4">
+                            {store.conceptProposals.map((concept, index) => {
+                                const colors = CONCEPT_COLORS[index % CONCEPT_COLORS.length];
+                                const Icon = colors.icon;
+                                const isSelected = concept.id === store.selectedConceptId;
+                                const isExpanded = expandedConceptId === concept.id;
+                                const policyLabels = concept.euPolicyAlignment
+                                    .map(id => EU_POLICY_OPTIONS.find(p => p.id === id)?.labelDE || id)
+                                    .filter(Boolean);
+
+                                return (
+                                    <div
+                                        key={concept.id}
+                                        className={`rounded-xl border-2 overflow-hidden transition-all duration-300 ${
+                                            isSelected
+                                                ? `${colors.borderSelected} ${colors.bgSelected} shadow-lg ring-2 ring-offset-1 ring-${colors.borderSelected.replace('border-', '')}/30`
+                                                : `${colors.border} bg-white hover:shadow-md`
+                                        }`}
+                                    >
+                                        {/* Card Header */}
+                                        <div
+                                            className={`bg-gradient-to-r ${colors.gradient} p-4 cursor-pointer`}
+                                            onClick={() => toggleExpanded(concept.id)}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                                                        <Icon className="h-5 w-5 text-white" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-mono">
+                                                                {concept.acronym}
+                                                            </span>
+                                                            <span className="bg-white/15 text-white/80 text-xs px-2 py-0.5 rounded-full">
+                                                                {colors.label}
+                                                            </span>
+                                                            {isSelected && (
+                                                                <span className="bg-white text-gray-800 text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                                                    <Check className="h-3 w-3" /> Ausgewahlt
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <h4 className="text-white font-bold text-sm mt-1 leading-tight">
+                                                            {concept.title}
+                                                        </h4>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {isExpanded
+                                                        ? <ChevronUp className="h-5 w-5 text-white/70" />
+                                                        : <ChevronDown className="h-5 w-5 text-white/70" />
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Card Body - Summary always visible */}
+                                        <div className="p-4">
+                                            <p className="text-sm text-gray-700 leading-relaxed">
+                                                {concept.summary}
+                                            </p>
+
+                                            {/* Expanded Details */}
+                                            {isExpanded && (
+                                                <div className="mt-4 space-y-4 pt-4 border-t border-gray-100">
+                                                    {/* Approach */}
+                                                    <div>
+                                                        <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Ansatz</h5>
+                                                        <p className="text-sm text-gray-700">{concept.approach}</p>
+                                                    </div>
+
+                                                    {/* Innovation */}
+                                                    <div>
+                                                        <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Innovation</h5>
+                                                        <p className="text-sm text-gray-700">{concept.innovation}</p>
+                                                    </div>
+
+                                                    {/* Outputs */}
+                                                    <div>
+                                                        <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Ergebnisse</h5>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {concept.mainOutputs.map((output, oi) => (
+                                                                <span key={oi} className={`text-xs px-2.5 py-1 rounded-lg ${colors.badge}`}>
+                                                                    {output}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* EU Policy Alignment */}
+                                                    {policyLabels.length > 0 && (
+                                                        <div>
+                                                            <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">EU Policy Alignment</h5>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {policyLabels.map((label, pi) => (
+                                                                    <span key={pi} className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                                                                        {label}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Select Button */}
+                                            <div className="mt-4 flex justify-end">
+                                                <Button
+                                                    onClick={(e) => { e.stopPropagation(); selectConceptProposal(concept.id); }}
+                                                    disabled={isSelected}
+                                                    className={
+                                                        isSelected
+                                                            ? 'bg-gray-100 text-gray-500 cursor-default'
+                                                            : `bg-gradient-to-r ${colors.gradient} hover:opacity-90 text-white`
+                                                    }
+                                                    size="sm"
+                                                >
+                                                    {isSelected ? (
+                                                        <><Check className="h-4 w-4 mr-1" /> Ausgewahlt</>
+                                                    ) : (
+                                                        <><Star className="h-4 w-4 mr-1" /> Dieses Konzept wahlen</>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Regenerate Button */}
+                        <div className="flex justify-center pt-2">
+                            <Button
+                                variant="outline"
+                                onClick={generateConceptProposals}
+                                disabled={store.isGeneratingConcepts}
+                                className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                            >
+                                <RefreshCw className={`h-4 w-4 mr-2 ${store.isGeneratingConcepts ? 'animate-spin' : ''}`} />
+                                Neue Konzeptvorschlage generieren
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Selected Concept Confirmation */}
+                {selectedConcept && (
+                    <div className="mt-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center shrink-0">
+                                <Check className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-indigo-900">
+                                    {selectedConcept.acronym} — {selectedConcept.title}
+                                </p>
+                                <p className="text-xs text-indigo-600 mt-0.5">
+                                    Ausgewahlt als Grundlage fur das Expose. Titel, Akronym und EU-Policy werden automatisch ubernommen.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/app-store';
 import { generateContentAction, generateJsonContentAction } from '@/app/actions/gemini';
 import { getEnhanceIdeaPrompt } from '@/lib/concept-prompts';
 import {
+    getStarsConceptProposalsPrompt,
     getPartnershipNarrativePrompt,
     getChallengeNarrativePrompt,
     getOpportunityNarrativePrompt,
@@ -13,7 +14,7 @@ import {
     getAssembleStarsExposePrompt,
 } from '@/lib/stars-prompts';
 import { ResearchSource } from '@/types/concept';
-import { StarsGoal, StarsTargetGroup, StarsMethodPrinciple } from '@/types/stars-concept';
+import { StarsGoal, StarsTargetGroup, StarsMethodPrinciple, StarsConceptProposal } from '@/types/stars-concept';
 import { extractTextFromPDF, extractTextFromDocx } from '@/lib/rag-system';
 
 // ============================================================================
@@ -226,6 +227,101 @@ Antworte im JSON-Format:
                 }));
             }
         }
+    };
+
+    // ========================================================================
+    // Step 2b: Generate 3 STARS Concept Proposals
+    // ========================================================================
+
+    const generateConceptProposals = async () => {
+        store.updateState({ isGeneratingConcepts: true, conceptError: undefined });
+
+        try {
+            const sourceContext = buildSourceContext(store.sources);
+            const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
+            const budget = store.budgetTier || (store.actionType === 'KA220' ? 250000 : 60000);
+
+            const prompt = getStarsConceptProposalsPrompt(
+                store.idea,
+                store.enhancedIdea,
+                store.problem,
+                store.enhancedProblem,
+                store.targetGroup,
+                store.sector,
+                store.actionType,
+                store.priorityFocus,
+                duration,
+                budget,
+                sourceContext,
+                store.additionalInstructions
+            );
+
+            const response = await generateContentAction(prompt, JSON_SYSTEM, 0.8, 60000);
+            const clean = cleanJsonResponse(response);
+            const parsed = JSON.parse(clean);
+
+            const conceptsArray = parsed.concepts || parsed;
+            const proposals: StarsConceptProposal[] = (Array.isArray(conceptsArray) ? conceptsArray : []).map(
+                (c: any, i: number) => ({
+                    id: `stars_concept_${Date.now()}_${i}`,
+                    title: c.title || '',
+                    acronym: (c.acronym || '').replace(/\s*\(.*?\)\s*$/, '').trim(), // Remove parenthetical expansion
+                    summary: c.summary || '',
+                    approach: c.approach || '',
+                    innovation: c.innovation || '',
+                    mainOutputs: c.mainOutputs || [],
+                    euPolicyAlignment: c.euPolicyAlignment || [],
+                    selected: false,
+                })
+            );
+
+            store.updateState({
+                conceptProposals: proposals,
+                conceptsGenerated: true,
+                isGeneratingConcepts: false,
+                // Clear selected concept when regenerating
+                selectedConceptId: null,
+                projectTitle: '',
+                projectAcronym: '',
+                euPolicyAlignment: [],
+            });
+        } catch (e: any) {
+            console.error('Concept proposals error:', e);
+            store.updateState({
+                isGeneratingConcepts: false,
+                conceptError: e?.message || 'Konzeptvorschläge konnten nicht generiert werden. Bitte erneut versuchen.',
+            });
+        }
+    };
+
+    // ========================================================================
+    // Step 2c: Select a Concept Proposal
+    // ========================================================================
+
+    const selectConceptProposal = (conceptId: string) => {
+        const concept = store.conceptProposals.find(c => c.id === conceptId);
+        if (!concept) return;
+
+        store.updateState({
+            selectedConceptId: conceptId,
+            conceptProposals: store.conceptProposals.map(c => ({
+                ...c,
+                selected: c.id === conceptId,
+            })),
+            // Set the project identity from the selected concept
+            projectTitle: concept.title,
+            projectAcronym: concept.acronym,
+            euPolicyAlignment: concept.euPolicyAlignment,
+            // Clear downstream generated content when switching concepts
+            challengeNarrative: '',
+            opportunityNarrative: '',
+            projectResponse: '',
+            goals: [],
+            starsTargetGroups: [],
+            methodPrinciples: [],
+            partnershipNarrative: '',
+            fullExpose: null,
+        });
     };
 
     // ========================================================================
@@ -504,6 +600,11 @@ Antworte im JSON-Format:
         try {
             const allPartners = useAppStore.getState().partners;
 
+            // Resolve title/acronym from selected concept
+            const selectedConcept = store.conceptProposals.find(c => c.id === store.selectedConceptId);
+            const projectTitle = store.projectTitle || selectedConcept?.title || 'Untitled Project';
+            const projectAcronym = store.projectAcronym || selectedConcept?.acronym || 'N/A';
+
             // Build partners table data
             const partnersTable = store.selectedPartners.map(sp => {
                 const p = allPartners.find(pp => pp.id === sp.partnerId);
@@ -530,8 +631,8 @@ Antworte im JSON-Format:
             const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
 
             const prompt = getAssembleStarsExposePrompt(
-                store.projectTitle,
-                store.projectAcronym,
+                projectTitle,
+                projectAcronym,
                 store.sector,
                 store.actionType,
                 duration,
@@ -614,6 +715,8 @@ ${store.fullExpose}`;
         enhanceIdea,
         runAnalysis,
         handleFileUpload,
+        generateConceptProposals,
+        selectConceptProposal,
         generatePartnershipNarrative,
         generateChallenge,
         generateOpportunity,

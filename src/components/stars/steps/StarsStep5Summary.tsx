@@ -36,6 +36,11 @@ export function StarsStep5Summary({ exportToPipeline }: StarsStep5SummaryProps) 
     const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
     const budget = store.budgetTier || (store.actionType === 'KA220' ? 250000 : 60000);
 
+    // Resolve title/acronym from selected concept if not manually set
+    const selectedConcept = store.conceptProposals.find(c => c.id === store.selectedConceptId);
+    const displayTitle = store.projectTitle || selectedConcept?.title || 'Kein Projekttitel';
+    const displayAcronym = store.projectAcronym || selectedConcept?.acronym || '';
+
     // ========================================================================
     // PDF EXPORT
     // ========================================================================
@@ -51,7 +56,7 @@ export function StarsStep5Summary({ exportToPipeline }: StarsStep5SummaryProps) 
             printWindow.document.write(`
                 <html>
                 <head>
-                    <title>${store.projectAcronym || store.projectTitle || 'STARS Expose'} - STARS Expose</title>
+                    <title>${displayAcronym || displayTitle || 'STARS Expose'} - STARS Expose</title>
                     <style>
                         body {
                             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -125,15 +130,15 @@ export function StarsStep5Summary({ exportToPipeline }: StarsStep5SummaryProps) 
             <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-6 text-white">
                 <div className="flex items-center gap-4 mb-4">
                     <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-2xl font-bold tracking-wide border-2 border-white/30">
-                        {store.projectAcronym?.substring(0, 3) || '?'}
+                        {displayAcronym?.substring(0, 3) || '?'}
                     </div>
                     <div className="flex-1 min-w-0">
                         <h3 className="text-xl font-bold truncate">
-                            {store.projectTitle || 'Kein Projekttitel'}
+                            {displayTitle}
                         </h3>
                         <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-indigo-200">
                             <span className="bg-white/15 px-2 py-0.5 rounded font-mono text-xs">
-                                {store.projectAcronym || 'N/A'}
+                                {displayAcronym || 'N/A'}
                             </span>
                             <span className="opacity-60">|</span>
                             <span>{store.actionType}</span>
@@ -456,10 +461,10 @@ export function StarsStep5Summary({ exportToPipeline }: StarsStep5SummaryProps) 
                             Erasmus+ STARS Projekt-Expose
                         </div>
                         <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                            {store.projectTitle || 'Projekttitel'}
+                            {displayTitle || 'Projekttitel'}
                         </h1>
                         <div style={{ fontSize: '0.875rem', color: '#64748b', fontFamily: 'monospace', marginTop: '0.5rem' }}>
-                            {store.projectAcronym || 'N/A'} | {store.actionType} | {sectorLabel} | {duration} Monate | {budget.toLocaleString('de-DE')} EUR
+                            {displayAcronym || 'N/A'} | {store.actionType} | {sectorLabel} | {duration} Monate | {budget.toLocaleString('de-DE')} EUR
                         </div>
                     </div>
                     <div className="prose max-w-none prose-indigo">

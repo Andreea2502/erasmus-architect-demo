@@ -40,6 +40,114 @@ LANGUAGE AND QUALITY RULES (apply to EVERY sentence you write):
 `.trim();
 
 // ============================================================================
+// 0. STARS CONCEPT PROPOSALS PROMPT (3 alternatives)
+// ============================================================================
+
+/**
+ * Generates 3 distinct STARS concept proposals.
+ * Each includes: title, acronym, summary, approach, innovation, outputs, EU policy alignment.
+ * Output: JSON with concepts array.
+ */
+export function getStarsConceptProposalsPrompt(
+  idea: string,
+  enhancedIdea: string,
+  problem: string,
+  enhancedProblem: string,
+  targetGroup: string,
+  sector: string,
+  actionType: string,
+  priorityFocus: string,
+  duration: number,
+  budget: number,
+  sourceContext: string,
+  additionalInstructions?: string
+): string {
+  const isKA210 = actionType === 'KA210';
+  const ideaText = enhancedIdea || idea;
+  const problemText = enhancedProblem || problem;
+
+  return `You are a senior Erasmus+ project designer developing 3 distinct concept proposals for a STARS-format Expose.
+
+PROJECT IDEA:
+"${ideaText}"
+
+PROBLEM STATEMENT:
+"${problemText}"
+
+TARGET GROUP: ${targetGroup}
+SECTOR: ${sector}
+ACTION TYPE: ${actionType}${isKA210 ? ' (Small-Scale Partnership, max 60k EUR)' : ' (Cooperation Partnership)'}
+PRIORITY FOCUS: ${priorityFocus}
+DURATION: ${duration} months
+BUDGET: ${budget.toLocaleString()} EUR
+
+RESEARCH EVIDENCE AND SOURCES:
+${sourceContext || '(no research sources uploaded yet)'}
+
+${additionalInstructions ? `ADDITIONAL USER INSTRUCTIONS:\n${additionalInstructions}\n` : ''}
+
+TASK: Generate exactly 3 DIFFERENT concept proposals, each representing a distinct strategic approach to the same problem. The concepts must differ substantially in:
+- Their core intervention model (e.g., Concept A: toolkit-based, Concept B: training cascade, Concept C: community of practice)
+- Their innovative element
+- Their primary outputs and deliverables
+- Their emphasis within the problem space
+
+FOR EACH CONCEPT, PROVIDE:
+
+1. "title": A professional English project title (8-12 words). The title must:
+   - Clearly communicate the project's purpose
+   - Be suitable for an official Erasmus+ application
+   - NOT start with generic words like "Innovative" or "Enhancing"
+
+2. "acronym": A creative, memorable English acronym (4-8 letters). The acronym must:
+   - Be pronounceable as a word (like STARS, BRIDGES, COMPASS)
+   - Relate meaningfully to the project's content
+   - Have each letter map to a word from the title or theme (explain the mapping in parentheses)
+
+3. "summary": A 3-5 sentence summary describing:
+   - What the project does (concrete actions)
+   - Who benefits directly
+   - What makes it different from existing approaches
+   - What the expected impact is
+
+4. "approach": A 2-3 sentence description of the core intervention strategy. What methodology will the project use? What is the "theory of change" — the causal chain from activity to impact?
+
+5. "innovation": A 2-3 sentence description of what is genuinely new or different about this concept. Reference what already exists and explain how this concept goes beyond it.
+
+6. "mainOutputs": An array of 3-5 concrete project outputs/deliverables. Each must be a tangible, verifiable item (e.g., "Open-access digital toolkit with 15 ready-to-use workshop modules", NOT "innovative resources").
+
+7. "euPolicyAlignment": An array of 2-4 EU policy area IDs from this list:
+   DIGITAL_TRANSFORMATION, SOCIAL_ECONOMY, CIVIL_SOCIETY_RESILIENCE, INCLUSION_DIVERSITY, GREEN_TRANSITION, EUROPEAN_EDUCATION_AREA, DIGITAL_EDUCATION_ACTION_PLAN, SKILLS_AGENDA, YOUTH_STRATEGY, DEMOCRATIC_PARTICIPATION
+   Select only those that genuinely align with the concept.
+
+DIFFERENTIATION RULES:
+- Concept 1: Focus on CAPACITY BUILDING — the primary mechanism is training, upskilling, or competence development.
+- Concept 2: Focus on TOOL/RESOURCE CREATION — the primary mechanism is developing a tangible product (toolkit, platform, curriculum, framework) that can be used after the project.
+- Concept 3: Focus on SYSTEMIC CHANGE — the primary mechanism is building networks, policy recommendations, or institutional change processes.
+- Each concept must be independently viable and complete — not a subset of another.
+${isKA210 ? '- Keep all concepts realistic for a small budget (max 60k EUR) and short timeline.' : ''}
+
+${ANTI_BUZZWORD_RULES}
+
+OUTPUT FORMAT: Respond ONLY with valid JSON:
+{
+  "concepts": [
+    {
+      "title": "...",
+      "acronym": "... (Letter-by-letter expansion)",
+      "summary": "...",
+      "approach": "...",
+      "innovation": "...",
+      "mainOutputs": ["Output 1", "Output 2", "Output 3"],
+      "euPolicyAlignment": ["POLICY_ID_1", "POLICY_ID_2"]
+    }
+  ]
+}
+
+No additional text outside the JSON.`;
+}
+
+// ============================================================================
 // 1. PARTNERSHIP NARRATIVE PROMPT
 // ============================================================================
 
