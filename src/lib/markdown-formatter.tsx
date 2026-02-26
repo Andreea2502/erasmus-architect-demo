@@ -1,167 +1,242 @@
 /**
  * MARKDOWN FORMATTER
  * ==================
- * Converts markdown-style text to formatted HTML for display
- * Handles: **bold**, *italic*, bullet points, numbered lists, line breaks
+ * Converts markdown-style text to formatted React elements for display.
+ * Handles: **bold**, *italic*, `code`, bullet points (-, •, *),
+ * numbered lists, headers (#, ##, ###), line breaks, and mixed HTML content.
  */
 
 import React from 'react';
 
 /**
+ * Strip HTML tags and convert to plain markdown-style text
+ * so formatMarkdownToReact can handle everything uniformly.
+ */
+function stripHtmlToText(html: string): string {
+    let text = html;
+    // Convert <br> / <br/> to newlines
+    text = text.replace(/<br\s*\/?>/gi, '\n');
+    // Convert <p>...</p> to double newlines
+    text = text.replace(/<\/p>\s*<p[^>]*>/gi, '\n\n');
+    text = text.replace(/<p[^>]*>/gi, '');
+    text = text.replace(/<\/p>/gi, '\n\n');
+    // Convert <strong>/<b> to **
+    text = text.replace(/<(strong|b)>/gi, '**');
+    text = text.replace(/<\/(strong|b)>/gi, '**');
+    // Convert <em>/<i> to *
+    text = text.replace(/<(em|i)>/gi, '*');
+    text = text.replace(/<\/(em|i)>/gi, '*');
+    // Convert <li> to bullet points
+    text = text.replace(/<li[^>]*>/gi, '- ');
+    text = text.replace(/<\/li>/gi, '\n');
+    // Convert heading tags
+    text = text.replace(/<h1[^>]*>/gi, '# ');
+    text = text.replace(/<\/h1>/gi, '\n\n');
+    text = text.replace(/<h2[^>]*>/gi, '## ');
+    text = text.replace(/<\/h2>/gi, '\n\n');
+    text = text.replace(/<h3[^>]*>/gi, '### ');
+    text = text.replace(/<\/h3>/gi, '\n\n');
+    text = text.replace(/<h4[^>]*>/gi, '#### ');
+    text = text.replace(/<\/h4>/gi, '\n\n');
+    // Remove remaining HTML tags
+    text = text.replace(/<[^>]+>/g, '');
+    // Decode common HTML entities
+    text = text.replace(/&amp;/g, '&');
+    text = text.replace(/&lt;/g, '<');
+    text = text.replace(/&gt;/g, '>');
+    text = text.replace(/&nbsp;/g, ' ');
+    text = text.replace(/&quot;/g, '"');
+    text = text.replace(/&#39;/g, "'");
+    // Clean up excessive whitespace
+    text = text.replace(/\n{3,}/g, '\n\n');
+    return text.trim();
+}
+
+/**
  * Clean up incomplete/broken markdown that might show as raw asterisks
- * Use this before displaying to ensure no raw markdown syntax shows
  */
 export function cleanBrokenMarkdown(text: string): string {
     if (!text) return '';
 
     let cleaned = text;
 
-    // STEP 1: Remove orphan ** that don't have a matching pair
-    // Count ** occurrences - if odd number, there's an unclosed one
+    // Step 1: Remove orphan ** that don't have a matching pair
     const doubleAsteriskMatches = cleaned.match(/\*\*/g);
     if (doubleAsteriskMatches && doubleAsteriskMatches.length % 2 !== 0) {
-        // Remove the last ** if odd count
         const lastIdx = cleaned.lastIndexOf('**');
         if (lastIdx !== -1) {
             cleaned = cleaned.substring(0, lastIdx) + cleaned.substring(lastIdx + 2);
         }
     }
 
-    // STEP 2: Fix **bold** that spans too much text (likely broken)
-    // If ** ... ** spans more than 200 characters, it's probably broken
+    // Step 2: Fix **bold** that spans too much text (> 200 chars = probably broken)
     cleaned = cleaned.replace(/\*\*([^*]{200,}?)\*\*/g, '$1');
 
-    // STEP 3: Remove ** at start of text without closing (common AI error)
+    // Step 3: Remove ** at start of text without closing
     if (cleaned.startsWith('**') && !cleaned.substring(2, 100).includes('**')) {
         cleaned = cleaned.substring(2);
     }
-
-    // STEP 4: Handle orphan single * that aren't part of ** or bullet points
-    // Match single * that isn't preceded or followed by another *
-    // But keep * at line start (bullet points)
-    cleaned = cleaned.replace(/(?<![\*\n^])(\*)(?!\*)/g, (match, p1, offset) => {
-        // Check if this is at start of line (bullet point)
-        const beforeChar = offset > 0 ? cleaned[offset - 1] : '\n';
-        if (beforeChar === '\n' || offset === 0) {
-            return match; // Keep bullet point asterisks
-        }
-        // Check for valid *italic* pair
-        const afterText = cleaned.substring(offset + 1);
-        const nextAsterisk = afterText.indexOf('*');
-        const nextDoubleAsterisk = afterText.indexOf('**');
-        // If there's a closing * before ** (or no **), it's valid italic
-        if (nextAsterisk !== -1 && (nextDoubleAsterisk === -1 || nextAsterisk < nextDoubleAsterisk)) {
-            return match; // Keep valid italic marker
-        }
-        return ''; // Remove orphan *
-    });
-
-    // STEP 5: Clean up any multiple spaces created
-    cleaned = cleaned.replace(/\s{2,}/g, ' ');
 
     return cleaned.trim();
 }
 
 /**
- * Converts markdown text to React elements with proper formatting
- * Supports: Headers (##), bullet lists, numbered lists, bold, italic
+ * Converts markdown text to React elements with proper formatting.
+ * This handles ALL content: pure markdown, HTML, and mixed.
+ * Supports: Headers (# ## ###), bullet lists (- • *), numbered lists (1. 2.),
+ * bold (**text**), italic (*text*), code (`text`), and line breaks.
  */
 export function formatMarkdownToReact(text: string): React.ReactNode {
     if (!text) return null;
 
-    // Clean any broken/incomplete markdown first to avoid showing raw asterisks
-    let cleanedText = cleanBrokenMarkdown(text);
+    // If content contains HTML tags, normalize it to markdown first
+    let processedText = text;
+    if (/<[a-z][\s\S]*>/i.test(processedText)) {
+        processedText = stripHtmlToText(processedText);
+    }
 
-    // STEP 1: Normalize inline headers - add newlines before ### and ## patterns
-    // This handles cases where AI generates "text. ### Header text" without line breaks
-    cleanedText = cleanedText
-        .replace(/\.\s*(#{1,3})\s+/g, '.\n\n$1 ')  // "text. ### Header" -> "text.\n\n### Header"
-        .replace(/([^.\n])\s*(#{1,3})\s+/g, '$1\n\n$2 '); // "text ### Header" -> "text\n\n### Header"
+    // Clean broken markdown
+    processedText = cleanBrokenMarkdown(processedText);
 
-    // STEP 2: Convert ## and ### headers to just bold text (no header styling)
-    // This creates clean paragraphs instead of jarring headers
-    cleanedText = cleanedText
-        .replace(/^###\s+(.+)$/gm, '\n**$1**\n')  // ### Header -> **Header**
-        .replace(/^##\s+(.+)$/gm, '\n**$1**\n')   // ## Header -> **Header**
-        .replace(/^#\s+(.+)$/gm, '\n**$1**\n');   // # Header -> **Header**
+    // Normalize header inline patterns
+    processedText = processedText
+        .replace(/\.\s*(#{1,3})\s+/g, '.\n\n$1 ')
+        .replace(/([^.\n])\s*(#{1,3})\s+/g, '$1\n\n$2 ');
 
-    // Split by double newlines for paragraphs
-    const paragraphs = cleanedText.split(/\n\n+/);
+    // Split into blocks by double newlines
+    const blocks = processedText.split(/\n\n+/);
 
     return (
-        <div className="prose prose-lg max-w-none text-base leading-relaxed">
-            {paragraphs.map((paragraph, pIdx) => {
-                const trimmedParagraph = paragraph.trim();
+        <div className="space-y-3">
+            {blocks.map((block, bIdx) => {
+                const trimmed = block.trim();
+                if (!trimmed) return null;
 
-                // Check for headers (## Header or ### Header)
-                if (trimmedParagraph.startsWith('### ')) {
+                // --- Headers ---
+                if (trimmed.startsWith('#### ')) {
                     return (
-                        <h4 key={pIdx} className="text-lg font-semibold text-gray-800 mt-4 mb-2 border-b border-gray-200 pb-1">
-                            {formatInlineMarkdown(trimmedParagraph.replace(/^###\s*/, ''))}
+                        <h5 key={bIdx} className="text-sm font-bold text-gray-800 mt-3 mb-1">
+                            {formatInlineMarkdown(trimmed.replace(/^####\s*/, ''))}
+                        </h5>
+                    );
+                }
+                if (trimmed.startsWith('### ')) {
+                    return (
+                        <h4 key={bIdx} className="text-base font-bold text-gray-800 mt-4 mb-1.5 border-b border-gray-200 pb-1">
+                            {formatInlineMarkdown(trimmed.replace(/^###\s*/, ''))}
                         </h4>
                     );
                 }
-                if (trimmedParagraph.startsWith('## ')) {
+                if (trimmed.startsWith('## ')) {
                     return (
-                        <h3 key={pIdx} className="text-xl font-bold text-blue-900 mt-5 mb-3 border-b-2 border-blue-200 pb-1">
-                            {formatInlineMarkdown(trimmedParagraph.replace(/^##\s*/, ''))}
+                        <h3 key={bIdx} className="text-lg font-bold text-blue-900 mt-5 mb-2 border-b-2 border-blue-200 pb-1">
+                            {formatInlineMarkdown(trimmed.replace(/^##\s*/, ''))}
                         </h3>
                     );
                 }
-                if (trimmedParagraph.startsWith('# ')) {
+                if (trimmed.startsWith('# ')) {
                     return (
-                        <h2 key={pIdx} className="text-2xl font-bold text-blue-900 mt-6 mb-4">
-                            {formatInlineMarkdown(trimmedParagraph.replace(/^#\s*/, ''))}
+                        <h2 key={bIdx} className="text-xl font-bold text-blue-900 mt-6 mb-3">
+                            {formatInlineMarkdown(trimmed.replace(/^#\s*/, ''))}
                         </h2>
                     );
                 }
 
-                // Check if this is a bullet list
-                const lines = paragraph.split('\n');
-                const isBulletList = lines.every(line =>
-                    line.trim().startsWith('- ') ||
-                    line.trim().startsWith('• ') ||
-                    line.trim().startsWith('* ') ||
-                    line.trim() === ''
-                );
+                // --- Split block into lines for list detection ---
+                const lines = trimmed.split('\n');
 
-                // Check if this is a numbered list
-                const isNumberedList = lines.every(line =>
-                    /^\d+[\.\)]\s/.test(line.trim()) ||
-                    line.trim() === ''
-                );
+                // Detect mixed content: some lines are bullets, some are not
+                // Group consecutive bullet lines vs paragraph lines
+                const groups: { type: 'bullets' | 'numbered' | 'paragraph'; lines: string[] }[] = [];
+                let currentGroup: { type: 'bullets' | 'numbered' | 'paragraph'; lines: string[] } | null = null;
 
-                if (isBulletList && lines.some(l => l.trim())) {
-                    return (
-                        <ul key={pIdx} className="list-disc list-outside space-y-2 my-3 ml-6 text-base text-gray-700">
-                            {lines
-                                .filter(line => line.trim())
-                                .map((line, lIdx) => (
-                                    <li key={lIdx} className="pl-1">
-                                        {formatInlineMarkdown(line.replace(/^[\-\•\*]\s*/, ''))}
+                for (const line of lines) {
+                    const trimLine = line.trim();
+                    if (!trimLine) continue;
+
+                    const isBullet = /^[-•*]\s+/.test(trimLine);
+                    const isNumbered = /^\d+[.)]\s+/.test(trimLine);
+                    const type = isBullet ? 'bullets' : isNumbered ? 'numbered' : 'paragraph';
+
+                    if (!currentGroup || currentGroup.type !== type) {
+                        currentGroup = { type, lines: [] };
+                        groups.push(currentGroup);
+                    }
+                    currentGroup.lines.push(trimLine);
+                }
+
+                // If there's only one group, render it directly
+                if (groups.length === 1) {
+                    const g = groups[0];
+                    if (g.type === 'bullets') {
+                        return (
+                            <ul key={bIdx} className="list-disc list-outside space-y-1.5 ml-5 text-sm text-gray-700">
+                                {g.lines.map((l, i) => (
+                                    <li key={i} className="pl-1 leading-relaxed">
+                                        {formatInlineMarkdown(l.replace(/^[-•*]\s*/, ''))}
                                     </li>
                                 ))}
-                        </ul>
+                            </ul>
+                        );
+                    }
+                    if (g.type === 'numbered') {
+                        return (
+                            <ol key={bIdx} className="list-decimal list-outside space-y-1.5 ml-5 text-sm text-gray-700">
+                                {g.lines.map((l, i) => (
+                                    <li key={i} className="pl-1 leading-relaxed">
+                                        {formatInlineMarkdown(l.replace(/^\d+[.)]\s*/, ''))}
+                                    </li>
+                                ))}
+                            </ol>
+                        );
+                    }
+                }
+
+                // Multiple groups or paragraph: render each group
+                if (groups.length > 1) {
+                    return (
+                        <div key={bIdx} className="space-y-2">
+                            {groups.map((g, gIdx) => {
+                                if (g.type === 'bullets') {
+                                    return (
+                                        <ul key={gIdx} className="list-disc list-outside space-y-1.5 ml-5 text-sm text-gray-700">
+                                            {g.lines.map((l, i) => (
+                                                <li key={i} className="pl-1 leading-relaxed">
+                                                    {formatInlineMarkdown(l.replace(/^[-•*]\s*/, ''))}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    );
+                                }
+                                if (g.type === 'numbered') {
+                                    return (
+                                        <ol key={gIdx} className="list-decimal list-outside space-y-1.5 ml-5 text-sm text-gray-700">
+                                            {g.lines.map((l, i) => (
+                                                <li key={i} className="pl-1 leading-relaxed">
+                                                    {formatInlineMarkdown(l.replace(/^\d+[.)]\s*/, ''))}
+                                                </li>
+                                            ))}
+                                        </ol>
+                                    );
+                                }
+                                return (
+                                    <p key={gIdx} className="text-sm text-gray-700 leading-relaxed">
+                                        {g.lines.map((l, i) => (
+                                            <React.Fragment key={i}>
+                                                {formatInlineMarkdown(l)}
+                                                {i < g.lines.length - 1 && <br />}
+                                            </React.Fragment>
+                                        ))}
+                                    </p>
+                                );
+                            })}
+                        </div>
                     );
                 }
 
-                if (isNumberedList && lines.some(l => l.trim())) {
-                    return (
-                        <ol key={pIdx} className="list-decimal list-outside space-y-2 my-3 ml-6 text-base text-gray-700">
-                            {lines
-                                .filter(line => line.trim())
-                                .map((line, lIdx) => (
-                                    <li key={lIdx} className="pl-1">
-                                        {formatInlineMarkdown(line.replace(/^\d+[\.\)]\s*/, ''))}
-                                    </li>
-                                ))}
-                        </ol>
-                    );
-                }
-
-                // Regular paragraph with line breaks - larger text
+                // Regular paragraph
                 return (
-                    <p key={pIdx} className="mb-3 text-base text-gray-700 leading-relaxed">
+                    <p key={bIdx} className="text-sm text-gray-700 leading-relaxed">
                         {lines.map((line, lIdx) => (
                             <React.Fragment key={lIdx}>
                                 {formatInlineMarkdown(line)}
@@ -190,7 +265,6 @@ function formatInlineMarkdown(text: string): React.ReactNode {
         const italicMatch = remaining.match(/(?<!\*)\*([^*]+)\*(?!\*)/);
         const codeMatch = remaining.match(/`([^`]+)`/);
 
-        // Find earliest match by index
         const matches: { type: string; match: RegExpMatchArray; idx: number }[] = [];
         if (boldMatch && boldMatch.index !== undefined) {
             matches.push({ type: 'bold', match: boldMatch, idx: boldMatch.index });
@@ -207,7 +281,6 @@ function formatInlineMarkdown(text: string): React.ReactNode {
             break;
         }
 
-        // Sort by index to find earliest
         matches.sort((a, b) => a.idx - b.idx);
         const earliest = matches[0];
 
@@ -224,7 +297,7 @@ function formatInlineMarkdown(text: string): React.ReactNode {
                 parts.push(<em key={key++} className="italic">{earliest.match[1]}</em>);
                 break;
             case 'code':
-                parts.push(<code key={key++} className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{earliest.match[1]}</code>);
+                parts.push(<code key={key++} className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{earliest.match[1]}</code>);
                 break;
         }
 
@@ -239,10 +312,15 @@ function formatInlineMarkdown(text: string): React.ReactNode {
  */
 export function stripMarkdown(text: string): string {
     if (!text) return '';
-    return text
-        .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove bold
-        .replace(/\*([^*]+)\*/g, '$1')     // Remove italic
-        .replace(/`([^`]+)`/g, '$1')       // Remove code
-        .replace(/^[\-\•\*]\s*/gm, '• ')   // Normalize bullets
-        .replace(/^\d+[\.\)]\s*/gm, '');   // Remove numbered list prefixes
+    let cleaned = text;
+    // Strip HTML first if present
+    if (/<[a-z][\s\S]*>/i.test(cleaned)) {
+        cleaned = stripHtmlToText(cleaned);
+    }
+    return cleaned
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/^[-•*]\s*/gm, '• ')
+        .replace(/^\d+[.)]\s*/gm, '');
 }
