@@ -282,7 +282,7 @@ export const getOfficialPipelineStructure = (actionType: 'KA220' | 'KA210' = 'KA
         {
           id: 'monitoring_wp1',
           text: 'Monitoring & Quality',
-          fullQuestion: 'Describe the approach and division of work you will apply to monitor project progress and ensure the quality of project implementation.',
+          fullQuestion: 'How will the progress, quality and achievement of project activities be monitored? Please give information about the involved staff, as well as the timing and frequency of the monitoring activities.',
           type: 'textarea',
           required: true,
           charLimit: 3000
@@ -290,7 +290,7 @@ export const getOfficialPipelineStructure = (actionType: 'KA220' | 'KA210' = 'KA
         {
           id: 'budget_control_wp1',
           text: 'Budget & Time Management',
-          fullQuestion: 'Describe how you will ensure sound budget management and timely implementation of the project activities.',
+          fullQuestion: 'How will you ensure proper budget control and time management in your project?',
           type: 'textarea',
           required: true,
           charLimit: 3000
@@ -298,23 +298,23 @@ export const getOfficialPipelineStructure = (actionType: 'KA220' | 'KA210' = 'KA
         {
           id: 'risk_management_wp1',
           text: 'Risk Management',
-          fullQuestion: 'Describe any risk that may affect project implementation and how you plan to mitigate potential risks.',
+          fullQuestion: 'What are your plans for handling risks for project implementation (e.g. delays, budget, conflicts, etc.)?',
           type: 'textarea',
           required: true,
           charLimit: 2000
         },
         {
           id: 'inclusion_design_wp1',
-          text: 'Inclusion Design',
-          fullQuestion: 'How will you ensure that the project approach is inclusive and allows the participation of people with fewer opportunities?',
+          text: 'Accessible & Inclusive Design',
+          fullQuestion: 'How will you ensure that the activities are designed in an accessible and inclusive way?',
           type: 'textarea',
           required: true,
           charLimit: 3000
         },
         {
           id: 'digital_tools_wp1',
-          text: 'Digital Tools',
-          fullQuestion: 'Describe how you will use digital tools and learning to implement project activities, deliver project results and share results with stakeholders.',
+          text: 'Digital Tools & Learning',
+          fullQuestion: 'How does the project incorporate the use of digital tools and learning methods to complement the physical activities and to improve cooperation between partner organisations?',
           type: 'textarea',
           required: true,
           charLimit: 3000
@@ -322,7 +322,7 @@ export const getOfficialPipelineStructure = (actionType: 'KA220' | 'KA210' = 'KA
         {
           id: 'green_practices_wp1',
           text: 'Green Practices',
-          fullQuestion: 'Describe how you will apply green practices in different project phases (e.g., avoiding printing, favouring virtual meetings over physical travel, etc.).',
+          fullQuestion: 'How does the project incorporate green practices in different project phases?',
           type: 'textarea',
           required: true,
           charLimit: 3000
@@ -330,17 +330,10 @@ export const getOfficialPipelineStructure = (actionType: 'KA220' | 'KA210' = 'KA
         {
           id: 'civic_engagement_wp1',
           text: 'Civic Engagement',
-          fullQuestion: 'Describe how the project promotes civic engagement and fosters participation in democratic life.',
+          fullQuestion: 'How does the project encourage participation and civic engagement in different project phases?',
           type: 'textarea',
           required: true,
           charLimit: 3000
-        },
-        {
-          id: 'grant_management_wp1',
-          text: 'Grant for Project Management',
-          fullQuestion: 'Please indicate the grant amount requested for Project Management.',
-          type: 'number',
-          required: true
         }
       ]
     }
@@ -354,7 +347,7 @@ export const getOfficialPipelineStructure = (actionType: 'KA220' | 'KA210' = 'KA
         {
           id: `wp_objectives_wp${i}`,
           text: 'WP Objectives',
-          fullQuestion: `Please describe the specific objectives of Work Package ${i} and how they contribute to achieving the general objectives of the project.`,
+          fullQuestion: `What are the specific objectives of this work package and how do they contribute to the general objectives of the project?`,
           type: 'textarea',
           required: true,
           charLimit: 2000
@@ -362,31 +355,23 @@ export const getOfficialPipelineStructure = (actionType: 'KA220' | 'KA210' = 'KA
         {
           id: `wp_results_wp${i}`,
           text: 'WP Results',
-          fullQuestion: `Please describe the main results expected from Work Package ${i}, including concrete deliverables and outputs.`,
+          fullQuestion: `What will be the main results of this work package?`,
           type: 'textarea',
           required: true,
           charLimit: 2000
         },
         {
-          id: `wp_indicators_qual_wp${i}`,
-          text: 'Qualitative Indicators',
-          fullQuestion: `Please describe the qualitative indicators you will use to measure the achievement of Work Package ${i} objectives.`,
+          id: `wp_indicators_wp${i}`,
+          text: 'Indicators',
+          fullQuestion: `What qualitative and quantitative indicators will you use to measure the level of the achievement of the work package objectives and the quality of the results?`,
           type: 'textarea',
           required: true,
-          charLimit: 2000
-        },
-        {
-          id: `wp_indicators_quan_wp${i}`,
-          text: 'Quantitative Indicators',
-          fullQuestion: `Please describe the quantitative indicators (numbers, targets) you will use to measure the achievement of Work Package ${i} objectives.`,
-          type: 'textarea',
-          required: true,
-          charLimit: 2000
+          charLimit: 3000
         },
         {
           id: `wp_partners_wp${i}`,
           text: 'Partners Roles',
-          fullQuestion: `Please describe the tasks and responsibilities of each partner in Work Package ${i}.`,
+          fullQuestion: `Please describe the tasks and responsibilities of each partner organisation in the work package.`,
           type: 'textarea',
           required: true,
           charLimit: 2000
@@ -394,7 +379,7 @@ export const getOfficialPipelineStructure = (actionType: 'KA220' | 'KA210' = 'KA
         {
           id: `wp_budget_wp${i}`,
           text: 'Budget Rationale',
-          fullQuestion: `Please explain the rationale for the budget allocation of Work Package ${i}.`,
+          fullQuestion: `Please explain how you define the amount dedicated to the work package and how the work package is cost-effective?`,
           type: 'textarea',
           required: true,
           charLimit: 5000
@@ -411,38 +396,34 @@ export const getOfficialPipelineStructure = (actionType: 'KA220' | 'KA210' = 'KA
         {
           id: `wp_act${actNum}_content_wp${i}`,
           text: `Activity ${actNum}: Content`,
-          fullQuestion: `Describe the content of Activity ${actNum} in Work Package ${i}. What specific tasks, workshops, meetings, or outputs will be produced?`,
+          fullQuestion: `Describe the content of the proposed activities.`,
           type: 'textarea' as const,
           required: actNum === 1,
-          charLimit: 1500,
-          helpText: 'Describe what will be done in this activity.'
+          charLimit: 1500
         },
         {
           id: `wp_act${actNum}_objectives_wp${i}`,
-          text: `Activity ${actNum}: Objectives Alignment`,
-          fullQuestion: `Explain how Activity ${actNum} in Work Package ${i} will help reach the WP objectives. How does this activity contribute to the overall goals?`,
+          text: `Activity ${actNum}: Objectives`,
+          fullQuestion: `Explain how these activities are going to help reach the WP objectives.`,
           type: 'textarea' as const,
           required: actNum === 1,
-          charLimit: 1000,
-          helpText: 'Link the activity to WP and project objectives.'
+          charLimit: 1000
         },
         {
           id: `wp_act${actNum}_results_wp${i}`,
           text: `Activity ${actNum}: Expected Results`,
-          fullQuestion: `Describe the expected results of Activity ${actNum} in Work Package ${i}. What concrete outcomes and deliverables will be achieved?`,
+          fullQuestion: `Describe the expected results of the activities.`,
           type: 'textarea' as const,
           required: actNum === 1,
-          charLimit: 1000,
-          helpText: 'Specify tangible outputs and outcomes.'
+          charLimit: 1000
         },
         {
           id: `wp_act${actNum}_participants_wp${i}`,
           text: `Activity ${actNum}: Participants`,
-          fullQuestion: `Provide the expected number and profile of participants for Activity ${actNum} in Work Package ${i}. Who will be involved and in what capacity?`,
+          fullQuestion: `Expected number and profile of participants.`,
           type: 'textarea' as const,
           required: actNum === 1,
-          charLimit: 800,
-          helpText: 'Include numbers and roles of participants.'
+          charLimit: 800
         }
       );
     }
