@@ -67,12 +67,21 @@ export function StarsStep5Summary({ exportToPipeline }: StarsStep5SummaryProps) 
                             color: #1e293b;
                         }
                         table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-                        th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
+                        th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; vertical-align: top; }
                         th { background: #003399; color: white; }
-                        h1, h2, h3 { color: #003399; }
+                        /* Hide empty header rows in label-value tables (Goals, Target Groups) */
+                        thead tr th:empty { background: none; border: none; padding: 0; height: 0; font-size: 0; line-height: 0; }
+                        thead:has(th:empty) { display: none; }
+                        /* Label column styling for 2-column key-value tables */
+                        td:first-child { width: 180px; min-width: 160px; font-weight: 500; color: #334155; background: #f8fafc; }
+                        td:last-child { width: auto; }
+                        /* Restore full-width columns for data tables (Section 1 identification table) */
+                        table:first-of-type td:first-child { width: auto; background: transparent; }
+                        h1, h2, h3, h4 { color: #003399; }
                         h1 { font-size: 1.8em; border-bottom: 2px solid #003399; padding-bottom: 0.5em; }
                         h2 { font-size: 1.4em; margin-top: 1.5em; }
                         h3 { font-size: 1.15em; }
+                        h4 { font-size: 1.05em; margin-top: 1.2em; margin-bottom: 0.3em; border-left: 3px solid #003399; padding-left: 0.5em; }
                         ul, ol { padding-left: 1.5em; }
                         blockquote { border-left: 3px solid #003399; padding-left: 1em; color: #475569; margin: 1em 0; }
                         @media print {

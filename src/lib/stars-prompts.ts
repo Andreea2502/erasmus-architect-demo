@@ -976,26 +976,40 @@ Insert the response text. The introductory paragraph should flow from the Opport
 
 ### Section 4: Project Goals
 
-Convert the goals JSON into a structured presentation. For each goal:
+Convert the goals JSON into a set of individual goal tables. For EACH goal, create a separate Markdown table using this EXACT format:
 
-**Goal [number]: [statement]**
+#### Goal [number]
 
-*Rationale:* [rationale text]
+| | |
+|:--|:--|
+| **Goal Statement** | [The full goal statement text] |
+| **Rationale** | [The rationale text explaining WHY this goal matters, with evidence references] |
+| **Measurable Outcome** | [The specific, quantified outcome that proves goal achievement] |
 
-*Measurable Outcome:* [measurable outcome text]
-
-Separate each goal with a blank line. After all goals, add 1-2 sentences reflecting on how the goals collectively address the challenge.
+IMPORTANT FORMATTING RULES FOR GOAL TABLES:
+- Each goal gets its OWN separate table preceded by an #### heading.
+- The table has exactly 2 columns: a narrow label column (left) and a wide content column (right).
+- The first row of each table must be empty headers: | | |
+- Use bold (**) for the labels in the left column.
+- Leave a blank line between each goal table.
+- After all goal tables, add 1-2 sentences reflecting on how the goals collectively address the challenge.
 
 ---
 
 ### Section 5: Target Groups
 
-Convert the target groups JSON into a Markdown table:
+Convert the target groups JSON into individual tables — one table per target group level. For EACH target group, use this format:
 
-| Level | Target Group | Description | Characteristics and Needs | Role in Project | Estimated Reach |
-|-------|-------------|-------------|--------------------------|-----------------|-----------------|
+#### [Level]: [Name]
 
-After the table, add 1-2 sentences explaining the cascade logic: how impact flows from primary through to quaternary level.
+| | |
+|:--|:--|
+| **Description** | [Description text] |
+| **Characteristics & Needs** | [Characteristics and needs text] |
+| **Role in Project** | [Role in project text] |
+| **Estimated Reach** | [Estimated reach number/text] |
+
+IMPORTANT: Use the same 2-column label/content table format as the goals section. Each level (PRIMARY, SECONDARY, TERTIARY, QUATERNARY) gets its own table. After all target group tables, add 1-2 sentences explaining the cascade logic: how impact flows from primary through to quaternary level.
 
 ---
 
