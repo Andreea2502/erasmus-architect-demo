@@ -895,6 +895,12 @@ export interface SavedConcept extends ProjectConcept {
   initialIdea: string;
   sector: Sector;
   actionType: ActionType;
+
+  // Mode discriminator: which concept developer created this?
+  conceptMode?: 'classic' | 'stars'; // undefined = classic (backward compat)
+
+  // STARS-specific structured data (only when conceptMode === 'stars')
+  starsData?: import('@/types/stars-concept').StarsData;
 }
 
 // ============================================================================
