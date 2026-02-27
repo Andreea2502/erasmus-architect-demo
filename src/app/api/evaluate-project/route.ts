@@ -129,7 +129,7 @@ WICHTIGSTE REGELN ZUR BEWERTUNG:
 
 Titel: ${state.projectTitle || 'Ohne Titel'}
 Aktionstyp: ${state.configuration?.actionType || 'KA220'}
-Dauer: ${state.configuration?.wpCount ? state.configuration.wpCount * 6 : 24} Monate
+Dauer: ${state.configuration?.duration || 24} Monate
 Budget: ${state.configuration?.totalBudget || 250000} EUR
 
 ### GANZER ANTRAG TEXT ###

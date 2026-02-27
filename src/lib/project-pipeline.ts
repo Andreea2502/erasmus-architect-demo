@@ -1033,7 +1033,7 @@ Aktionstyp: ${state.idea.actionType}
 Zielgruppen: ${state.idea.targetGroups?.join(', ') || 'Jugendliche, Erwachsene'}
 Hauptziel: ${state.idea.mainObjective || 'Kompetenzentwicklung'}
 Budget: ${state.configuration?.totalBudget || 250000} EUR
-Projektdauer: ${state.configuration?.wpCount ? state.configuration.wpCount * 6 : 24} Monate
+Projektdauer: ${state.configuration?.duration || 24} Monate
 
 === KONSORTIUM (DETAILS) ===
 ${detailedPartnerContext}
@@ -1665,12 +1665,24 @@ ${knowledgePoolContext ? knowledgePoolContext : ''}
 
 ${ragContext ? `=== WISSEN AUS STUDIEN/KNOWLEDGE BASE ===\n${ragContext}\n` : ''}
 
-${originalConcept ? `=== URSPRÜNGLICHES KONZEPT (GROUNDING) ===
-Titel: ${originalConcept.title}
+${originalConcept ? `
+═══════════════════════════════════════════════════════════════
+VERBINDLICHES KONZEPT — DER ANTRAG MUSS DIESEM ENTWURF FOLGEN
+═══════════════════════════════════════════════════════════════
+
+PROJEKT-METADATEN (BINDEND — NICHT ÄNDERN):
+- Titel: ${originalConcept.title}
+- Aktionstyp: ${state.configuration?.actionType || 'KA220'}
+- Dauer: ${state.configuration?.duration || 24} Monate
+- Budget: ${state.configuration?.totalBudget || 250000} EUR
+- Partneranzahl: ${state.consortium?.length || 0} Organisationen
+- Partnerländer: ${[...new Set(state.consortium?.map(p => p.country) || [])].join(', ')}
+
+KONZEPT-INHALT:
 Problem: ${originalConcept.problemStatement}
 Innovation: ${originalConcept.innovation}
 Erwarteter Impact: ${originalConcept.expectedImpact}
-${originalConcept.detailedConcept ? `Detailliertes Konzept (WICHTIGSTE QUELLE):\n${originalConcept.detailedConcept}\n` : ''}
+${originalConcept.detailedConcept ? `\nDetailliertes Konzept (WICHTIGSTE QUELLE — das gesamte Exposé):\n${originalConcept.detailedConcept}\n` : ''}
 Verwendete Quellen/Studien aus Recherche:
 ${originalConcept.studyReferences?.map(s => `- ${s.title} (${s.url || 'Keine URL'}): ${s.snippet || ''}`).join('\n') || 'Keine spezifischen Quellen'}
 ${originalConcept.objectives && originalConcept.objectives.length > 0 ? `
@@ -1686,6 +1698,17 @@ ${(originalConcept as any).starsData.starsTargetGroups?.length > 0 ? `Zielgruppe
 ${(originalConcept as any).starsData.methodPrinciples?.length > 0 ? `Methodologische Prinzipien:\n${(originalConcept as any).starsData.methodPrinciples.map((mp: any) => `- ${mp.name}: ${mp.description}`).join('\n')}\n` : ''}
 ${(originalConcept as any).starsData.partnershipNarrative ? `Partnerschafts-Narrativ:\n${(originalConcept as any).starsData.partnershipNarrative}\n` : ''}
 === ENDE STARS DATEN ===` : ''}
+
+═══════════════════════════════════════════════════════════════
+ABSOLUTE BINDUNGSREGELN FÜR DEN GENERATOR:
+1. Dein Antrag ist eine AUSFORMULIERUNG des obigen Konzepts — KEIN neuer Entwurf.
+2. ALLE Zahlen (Teilnehmer, Länder, Dauer, Budget) MÜSSEN mit dem Konzept übereinstimmen.
+3. ERFINDE KEINE neuen Ziele, Zielgruppen, Partner oder Aktivitäten die nicht im Konzept stehen.
+4. Wenn das Konzept "60 Lehrkräfte" sagt, schreibe "60 Lehrkräfte" — nicht 75, nicht 100.
+5. Wenn das Konzept "${state.configuration?.duration || 24} Monate" sagt, schreibe "${state.configuration?.duration || 24} Monate".
+6. Referenziere NUR die ${state.consortium?.length || 0} Partnerländer: ${[...new Set(state.consortium?.map(p => p.country) || [])].join(', ')}.
+7. Das Konzept wurde bereits mit Partnern abgestimmt. Abweichungen zerstören das Vertrauen.
+═══════════════════════════════════════════════════════════════
 ` : ''}
 
 === ANTWORT-FORMAT & LÄNGEN-VORGABEN (KRITIKALITÄT: HOCH) ===
@@ -2017,17 +2040,21 @@ export async function generateSinglePartnerAnswer(
 
   // Project context
   const projectContext = `
-=== PROJEKT-KONTEXT ===
+=== PROJEKT-KONTEXT (BINDEND) ===
 Projekttitel: ${state.projectTitle || state.idea.shortDescription}
 Akronym: ${state.acronym || 'N/A'}
 Aktionstyp: ${state.configuration?.actionType || 'KA220'}
+Dauer: ${state.configuration?.duration || 24} Monate
+Budget: ${state.configuration?.totalBudget || 250000} EUR
 Sektor: ${state.idea.sector}
+Partner: ${state.consortium?.length || 0} Organisationen aus ${[...new Set(state.consortium?.map(p => p.country) || [])].join(', ')}
 Hauptziel: ${state.idea.mainObjective}
 ${state.originalConcept ? `
 Konzept-Innovation: ${state.originalConcept.innovation}
 Problemstellung: ${state.originalConcept.problemStatement}
 ${state.originalConcept.detailedConcept ? `Detailliertes Konzept (WICHTIGSTE QUELLE):\n${state.originalConcept.detailedConcept}\n` : ''}
-${(state.originalConcept as any).starsData?.methodPrinciples?.length > 0 ? `Methodologische Prinzipien:\n${(state.originalConcept as any).starsData.methodPrinciples.map((mp: any) => `- ${mp.name}: ${mp.description}`).join('\n')}\n` : ''}` : ''}`;
+${(state.originalConcept as any).starsData?.methodPrinciples?.length > 0 ? `Methodologische Prinzipien:\n${(state.originalConcept as any).starsData.methodPrinciples.map((mp: any) => `- ${mp.name}: ${mp.description}`).join('\n')}\n` : ''}
+WICHTIG: Alle Zahlen, Zielgruppen und Aktivitäten MÜSSEN mit dem Konzept übereinstimmen. Nichts erfinden!` : ''}`;
 
   // Existing text context (for improvements)
   const existingTextContext = existingValue
@@ -3069,10 +3096,13 @@ export async function generateSingleWorkPackage(
   // Get concept context if available
   const conceptContext = state.originalConcept
     ? `
-=== KONZEPT-KONTEXT ===
+=== KONZEPT-KONTEXT (BINDEND — WP muss sich an das Konzept halten) ===
 Projekt-Innovation: ${state.originalConcept.innovation || 'N/A'}
 Problemstellung: ${state.originalConcept.problemStatement || 'N/A'}
 Erwarteter Impact: ${state.originalConcept.expectedImpact || 'N/A'}
+Projektdauer: ${state.configuration?.duration || 24} Monate
+Gesamtbudget: ${state.configuration?.totalBudget || 250000} EUR
+Partnerländer: ${[...new Set(state.consortium?.map(p => p.country) || [])].join(', ')}
 ${state.originalConcept.detailedConcept ? `\nDetailliertes Konzept (WICHTIGSTE QUELLE):\n${state.originalConcept.detailedConcept}\n` : ''}
 ${state.originalConcept.ltta ? `LTTA geplant: ${state.originalConcept.ltta.count} Events mit ${state.originalConcept.ltta.participants} Teilnehmern` : ''}
 ${state.originalConcept.multiplierEvents ? `Multiplier Events: ${state.originalConcept.multiplierEvents.count} Events` : ''}
@@ -3082,6 +3112,7 @@ ${(state.originalConcept as any).starsData.goals?.length > 0 ? `Projektziele:\n$
 ${(state.originalConcept as any).starsData.starsTargetGroups?.length > 0 ? `Zielgruppen:\n${(state.originalConcept as any).starsData.starsTargetGroups.map((tg: any) => `${tg.level}: ${tg.name} — Reichweite: ${tg.estimatedReach}`).join('\n')}\n` : ''}
 ${(state.originalConcept as any).starsData.methodPrinciples?.length > 0 ? `Methodologische Prinzipien:\n${(state.originalConcept as any).starsData.methodPrinciples.map((mp: any) => `- ${mp.name}: ${mp.description}`).join('\n')}\n` : ''}
 === ENDE STARS DATEN ===` : ''}
+WICHTIG: Aktivitäten und Deliverables dieses WP MÜSSEN mit dem Konzept konsistent sein. Keine neuen Zahlen erfinden!
 `
     : '';
 
@@ -3106,7 +3137,9 @@ ${conceptContext}
 === PROJEKT ===
 Titel: ${state.projectTitle || state.idea.shortDescription}
 Akronym: ${state.acronym || 'N/A'}
+Aktionstyp: ${state.configuration?.actionType || 'KA220'}
 Sektor: ${state.idea.sector}
+Projektdauer: ${state.configuration?.duration || 24} Monate
 Partner: ${partnerList}
 Hauptziel: ${state.idea.mainObjective}
 Gesamtbudget: ${state.configuration?.totalBudget || 250000}€
@@ -3692,7 +3725,7 @@ export function createInitialPipelineState(
       totalBudget: configuration?.totalBudget || 250000,
       wpCount,
       actionType,
-      duration: configuration?.duration || originalConcept?.workPackages?.[0]?.duration?.end,
+      duration: configuration?.duration || (originalConcept as any)?.duration || 24,
     },
     currentStep: 0,
     totalSteps: dynamicSteps.length,

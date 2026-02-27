@@ -388,7 +388,7 @@ export function useProjectPipeline(initialProjectId?: string) {
                 actionType: state.idea.actionType,
                 sector: state.idea.sector,
                 budgetTier: state.configuration?.totalBudget || 250000,
-                duration: (state.configuration?.wpCount || 5) * 6,
+                duration: state.configuration?.duration || 24,
                 callYear: new Date().getFullYear(),
                 horizontalPriorities: [],
                 statistics: [],
