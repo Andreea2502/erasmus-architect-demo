@@ -46,6 +46,7 @@ export function useProjectPipeline(initialProjectId?: string) {
     // Pipeline State
     const [pipelineState, setPipelineState] = useState<PipelineState | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isAutoRunning, setIsAutoRunning] = useState(false);
     const [currentStatus, setCurrentStatus] = useState('');
 
     // Setup Phase
@@ -124,6 +125,7 @@ export function useProjectPipeline(initialProjectId?: string) {
     // Safety Reset Function
     const handleSafetyReset = () => {
         setIsGenerating(false);
+        setIsAutoRunning(false);
         setIsImproving(false);
         setIsLoadingSuggestions(false);
         setIsLoadingPartner(false);
@@ -482,6 +484,7 @@ export function useProjectPipeline(initialProjectId?: string) {
         fromConcept, setFromConcept,
         pipelineState, setPipelineState,
         isGenerating, setIsGenerating,
+        isAutoRunning, setIsAutoRunning,
         currentStatus, setCurrentStatus,
         setupPhase, setSetupPhase,
         ideaDescription, setIdeaDescription,

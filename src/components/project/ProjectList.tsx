@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAppStore } from "@/store/app-store";
 import {
   SECTOR_LABELS,
@@ -58,6 +59,9 @@ export function ProjectList() {
   const projects = useAppStore((state) => state.projects);
   const partners = useAppStore((state) => state.partners);
   const deleteProject = useAppStore((state) => state.deleteProject);
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'drafts' ? 'drafts' : 'all';
+  const [activeTab, setActiveTab] = useState<'all' | 'drafts'>(initialTab);
   const [search, setSearch] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
@@ -140,6 +144,71 @@ export function ProjectList() {
     };
   };
 
+  // Draft-specific projects (have generatorState, not yet submitted/archived)
+  const draftProjects = projects
+    .filter(p =>
+      p.generatorState &&
+      (p.status as string) !== 'CONCEPT' &&
+      (p.status as string) !== 'SUBMITTED' &&
+      (p.status as string) !== 'APPROVED' &&
+      (p.status as string) !== 'ARCHIVED' &&
+      (p.title.toLowerCase().includes(search.toLowerCase()) ||
+        p.acronym.toLowerCase().includes(search.toLowerCase()))
+    )
+    .sort((a, b) => {
+      const dateA = new Date(a.lastGeneratorUpdate || a.updatedAt || a.createdAt).getTime();
+      const dateB = new Date(b.lastGeneratorUpdate || b.updatedAt || b.createdAt).getTime();
+      return dateB - dateA;
+    });
+
+  const getDetailedProgress = (project: typeof projects[0]) => {
+    if (!project.generatorState) return null;
+    const state = project.generatorState;
+    const at = state.configuration?.actionType || project.actionType || 'KA220';
+    const totalSteps = at === 'KA220' ? 8 : 6;
+    const currentStep = state.currentStep || 0;
+    const completedWPs = state.workPackages?.length || 0;
+    const totalWPs = state.configuration?.wpCount || 5;
+    const answers = state.answers || {};
+    const answeredCount = Object.values(answers).filter((a: any) =>
+      typeof a === 'string' ? a.length > 0 : a?.value?.length > 0
+    ).length;
+
+    const stepLabelsDE: Record<number, string> = at === 'KA220' ? {
+      0: 'Noch nicht gestartet',
+      1: 'Kontext',
+      2: 'Organisationen',
+      3: 'Relevanz & Ziele',
+      4: 'Partnerschaft',
+      5: 'Wirkung & Impact',
+      6: `Arbeitspakete (${completedWPs}/${totalWPs})`,
+      7: 'Zusammenfassung',
+      8: 'Finale Evaluierung',
+    } : {
+      0: 'Noch nicht gestartet',
+      1: 'Kontext',
+      2: 'Organisationen',
+      3: 'Relevanz',
+      4: `Aktivitäten (${completedWPs}/${totalWPs})`,
+      5: 'Impact & Dissemination',
+      6: 'Zusammenfassung',
+    };
+
+    const lastFeedback = state.evaluatorFeedback?.slice(-1)[0];
+
+    return {
+      currentStep,
+      totalSteps,
+      percent: Math.round((currentStep / totalSteps) * 100),
+      completedWPs,
+      totalWPs,
+      answeredCount,
+      currentStepLabel: stepLabelsDE[currentStep] || `Schritt ${currentStep}`,
+      lastScore: lastFeedback?.score,
+      actionType: at,
+    };
+  };
+
   const getProjectObjective = (project: typeof projects[0]) => {
     // Try to get objective from generator state
     if (project.generatorState?.objectives?.generalObjective) {
@@ -189,8 +258,147 @@ export function ProjectList() {
         />
       </div>
 
-      {/* Project List */}
-      {filteredProjects.length === 0 ? (
+      {/* Tab Navigation */}
+      <div className="flex gap-1 mb-4 border-b">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`px-4 py-2.5 rounded-t-lg font-medium text-sm transition-colors ${
+            activeTab === 'all'
+              ? 'bg-[#003399] text-white'
+              : 'text-gray-500 hover:bg-gray-100'
+          }`}
+        >
+          Alle Projekte ({filteredProjects.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('drafts')}
+          className={`px-4 py-2.5 rounded-t-lg font-medium text-sm transition-colors ${
+            activeTab === 'drafts'
+              ? 'bg-orange-500 text-white'
+              : 'text-gray-500 hover:bg-gray-100'
+          }`}
+        >
+          📝 Entwürfe ({draftProjects.length})
+        </button>
+      </div>
+
+      {/* Drafts Tab */}
+      {activeTab === 'drafts' && (
+        <>
+          {draftProjects.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border">
+              <div className="text-gray-400 mb-4">
+                <FileText size={48} className="mx-auto" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Keine Entwürfe vorhanden
+              </h3>
+              <p className="text-gray-500 mb-4">
+                Starten Sie einen neuen Antrag im Generator — er wird automatisch hier gespeichert.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {draftProjects.map((project) => {
+                const progress = getDetailedProgress(project);
+                if (!progress) return null;
+                const lastUpdate = project.lastGeneratorUpdate || project.updatedAt || project.createdAt;
+
+                return (
+                  <div
+                    key={project.id}
+                    className="bg-white rounded-xl border p-5 hover:shadow-lg transition-all"
+                  >
+                    {/* Top: Badges */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-xs font-medium">
+                        Entwurf
+                      </span>
+                      <span className="bg-[#003399]/10 text-[#003399] px-2 py-1 rounded-full text-xs font-medium">
+                        {ACTION_TYPE_LABELS[project.actionType]}
+                      </span>
+                      <span className="text-xs text-gray-400 ml-auto">
+                        {getRelativeTime(lastUpdate)}
+                      </span>
+                    </div>
+
+                    {/* Title */}
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {project.acronym || project.title || 'Untitled'}
+                    </h3>
+                    {project.acronym && project.title && (
+                      <p className="text-sm text-gray-500 mb-3 truncate">{project.title}</p>
+                    )}
+
+                    {/* Step Progress Visual */}
+                    <div className="mt-3">
+                      <div className="flex items-center gap-1 mb-2">
+                        {Array.from({ length: progress.totalSteps }, (_, i) => (
+                          <div key={i} className={`h-2 flex-1 rounded-full transition-colors ${
+                            i + 1 <= progress.currentStep ? 'bg-emerald-500' :
+                            i + 1 === progress.currentStep + 1 ? 'bg-orange-400 animate-pulse' :
+                            'bg-gray-200'
+                          }`} />
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Aktuell: {progress.currentStepLabel}</span>
+                        <span>{progress.percent}%</span>
+                      </div>
+                    </div>
+
+                    {/* Quick Stats */}
+                    <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+                      <div className="bg-gray-50 rounded-lg py-2">
+                        <div className="text-lg font-bold text-[#003399]">{progress.answeredCount}</div>
+                        <div className="text-[10px] text-gray-500 uppercase">Antworten</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg py-2">
+                        <div className="text-lg font-bold text-orange-600">{progress.completedWPs}/{progress.totalWPs}</div>
+                        <div className="text-[10px] text-gray-500 uppercase">
+                          {progress.actionType === 'KA210' ? 'Aktivitäten' : 'WPs'}
+                        </div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg py-2">
+                        <div className="text-lg font-bold text-green-600">{progress.lastScore?.toFixed(1) || '–'}</div>
+                        <div className="text-[10px] text-gray-500 uppercase">Score</div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 mt-4">
+                      <Link
+                        href={`/generator?project=${project.id}`}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium text-sm transition-colors"
+                      >
+                        <Play size={16} />
+                        Fortsetzen
+                      </Link>
+                      <button
+                        onClick={() => showDeleteConfirm === project.id
+                          ? handleDelete(project.id)
+                          : setShowDeleteConfirm(project.id)
+                        }
+                        className={`px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                          showDeleteConfirm === project.id
+                            ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                            : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                        }`}
+                        title={showDeleteConfirm === project.id ? 'Klicken zum Bestätigen' : 'Löschen'}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Project List (All tab) */}
+      {activeTab === 'all' && filteredProjects.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border">
           <div className="text-gray-400 mb-4">
             <FolderKanban size={48} className="mx-auto" />
@@ -213,7 +421,7 @@ export function ProjectList() {
             </Link>
           )}
         </div>
-      ) : (
+      ) : activeTab === 'all' ? (
         <div className="space-y-4">
           {filteredProjects.map((project) => {
             const StatusIcon = statusIcons[project.status];
@@ -522,7 +730,7 @@ export function ProjectList() {
             );
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

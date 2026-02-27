@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -63,6 +63,8 @@ import {
   Maximize2,
   Minimize2,
   BookmarkPlus,
+  Square,
+  Timer,
 } from 'lucide-react';
 import {
   PipelineState,
@@ -124,6 +126,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
     fromConcept, setFromConcept,
     pipelineState, setPipelineState,
     isGenerating, setIsGenerating,
+    isAutoRunning, setIsAutoRunning,
     currentStatus, setCurrentStatus,
     setupPhase, setSetupPhase,
     ideaDescription, setIdeaDescription,
@@ -187,6 +190,9 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
     isGuideThinking, setIsGuideThinking,
     handleAskGuide
   } = useProjectPipeline(initialProjectId);
+
+  const autoRunCancelledRef = useRef(false);
+  const autoRunStartTimeRef = useRef<number>(0);
 
   const addSnippet = useAppStore(state => state.addSnippet);
   const [savedSnippetsStatus, setSavedSnippetsStatus] = useState<Record<string, boolean>>({});
@@ -307,6 +313,18 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
       setPendingProjectId(null);
     }
   }, [projects, pendingProjectId, currentProjectId, fromConcept]);
+
+  // Prevent accidental browser close during auto-run
+  useEffect(() => {
+    if (isAutoRunning) {
+      const handler = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+        e.returnValue = '';
+      };
+      window.addEventListener('beforeunload', handler);
+      return () => window.removeEventListener('beforeunload', handler);
+    }
+  }, [isAutoRunning]);
 
   // Load existing project into generator
   const loadProjectIntoGenerator = (projectId: string, fromConcept: boolean = false) => {
@@ -783,124 +801,198 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
     return true;
   };
 
-  // Execute steps up to Step 5 automatically
-  // WP steps (6+) must be executed individually to avoid API timeouts
+  // Full auto-run: Execute ALL steps automatically (1 through final step)
+  // Includes sub-steps for partners (Step 2) and WPs (Step 6 / KA210 Step 4)
   const handleExecuteAll = async () => {
     if (!pipelineState) return;
 
-    // Use the dynamic wpCount to determine the correct number of steps
     const dynamicSteps = getPipelineSteps(wpCount);
     let currentLocalState = { ...pipelineState };
+    const currentActionType = currentLocalState.configuration?.actionType || actionType || 'KA220';
 
     // Update totalSteps in state if it mismatches
     if (currentLocalState.totalSteps !== dynamicSteps.length) {
       currentLocalState.totalSteps = dynamicSteps.length;
     }
 
-    // Only execute steps 1-5 automatically (before WPs)
-    // WP steps (6+) must be started individually
-    const maxAutoStep = 5;
-
-    // Loop from the next step until step 5 (or if already past 5, just do the next one)
+    // Full auto-run: go through ALL steps
     const startStep = currentLocalState.currentStep + 1;
-    const endStep = Math.min(maxAutoStep, dynamicSteps.length);
+    const endStep = dynamicSteps.length;
 
-    // If we're already at or past step 5, stop
-    if (startStep > maxAutoStep) {
+    if (startStep > endStep) {
       setCurrentStatus(language === 'de'
-        ? 'Arbeitspakete müssen einzeln generiert werden. Klicken Sie auf "Generieren" bei jedem WP.'
-        : 'Work packages must be generated individually. Click "Generate" for each WP.');
+        ? '✅ Antrag bereits vollständig generiert!'
+        : '✅ Application already fully generated!');
       return;
     }
 
+    // Initialize auto-run state
+    autoRunCancelledRef.current = false;
+    autoRunStartTimeRef.current = Date.now();
+    setIsAutoRunning(true);
+
     for (let step = startStep; step <= endStep; step++) {
+      // Check cancellation
+      if (autoRunCancelledRef.current) {
+        setCurrentStatus(language === 'de'
+          ? `⏹ Auto-Generierung bei Schritt ${step} gestoppt. Fortschritt gespeichert.`
+          : `⏹ Auto-generation stopped at step ${step}. Progress saved.`);
+        saveGeneratorStateToProject(currentLocalState);
+        break;
+      }
+
       setIsGenerating(true);
       setExpandedStep(step);
 
-      try {
-        // Force a small delay before starting to ensure UI is ready
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      let retryCount = 0;
+      let stepSuccess = false;
 
-        // SPECIAL HANDLING: Step 2 uses sub-steps per partner
-        if (step === 2) {
-          const partnerCount = currentLocalState.consortium.length;
-          setCurrentStatus(language === 'de'
-            ? `Generiere Schritt 2: Organisationen (${partnerCount} Partner)...`
-            : `Generating step 2: Organisations (${partnerCount} partners)...`);
+      while (!stepSuccess && retryCount <= 1) {
+        try {
+          // Small delay before starting to ensure UI is ready
+          await new Promise(resolve => setTimeout(resolve, 2000));
 
-          // Execute for each partner individually
-          for (let partnerIdx = 0; partnerIdx < partnerCount; partnerIdx++) {
-            const partner = currentLocalState.consortium[partnerIdx];
+          // Determine if this is a WP step with sub-steps
+          const isWPStep = (currentActionType === 'KA220' && step === 6) || (currentActionType === 'KA210' && step === 4);
+
+          if (step === 2) {
+            // SPECIAL HANDLING: Step 2 uses sub-steps per partner
+            const partnerCount = currentLocalState.consortium.length;
             setCurrentStatus(language === 'de'
-              ? `Schritt 2.${partnerIdx + 1}: ${partner.name}...`
-              : `Step 2.${partnerIdx + 1}: ${partner.name}...`);
+              ? `Generiere Schritt 2: Organisationen (${partnerCount} Partner)...`
+              : `Generating step 2: Organisations (${partnerCount} partners)...`);
+
+            for (let partnerIdx = 0; partnerIdx < partnerCount; partnerIdx++) {
+              if (autoRunCancelledRef.current) break;
+
+              const partner = currentLocalState.consortium[partnerIdx];
+              setCurrentStatus(language === 'de'
+                ? `Schritt 2: Partner ${partnerIdx + 1}/${partnerCount} — ${partner.name}...`
+                : `Step 2: Partner ${partnerIdx + 1}/${partnerCount} — ${partner.name}...`);
+
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Partner timeout')), 180000);
+              });
+
+              const { newState } = await Promise.race([
+                executeStep(currentLocalState, 2, language, setCurrentStatus, partnerIdx),
+                timeoutPromise
+              ]);
+
+              currentLocalState = newState;
+              setPipelineState(newState);
+
+              if (partnerIdx < partnerCount - 1) {
+                await new Promise(resolve => setTimeout(resolve, 5000));
+              }
+            }
+          } else if (isWPStep) {
+            // SPECIAL HANDLING: WP step uses sub-steps per work package
+            const wpTotal = currentLocalState.configuration?.wpCount || 5;
+            setCurrentStatus(language === 'de'
+              ? `Generiere Schritt ${step}: Arbeitspakete (${wpTotal} WPs)...`
+              : `Generating step ${step}: Work Packages (${wpTotal} WPs)...`);
+
+            for (let wpIdx = 0; wpIdx < wpTotal; wpIdx++) {
+              if (autoRunCancelledRef.current) break;
+
+              setCurrentStatus(language === 'de'
+                ? `Schritt ${step}: WP ${wpIdx + 1} von ${wpTotal}...`
+                : `Step ${step}: WP ${wpIdx + 1} of ${wpTotal}...`);
+
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('WP timeout')), 1200000); // 20 min per WP
+              });
+
+              const { newState } = await Promise.race([
+                executeStep(currentLocalState, step, language, setCurrentStatus, wpIdx),
+                timeoutPromise
+              ]);
+
+              currentLocalState = newState;
+              setPipelineState(newState);
+
+              // Auto-save after each WP
+              saveGeneratorStateToProject(newState);
+
+              if (wpIdx < wpTotal - 1) {
+                await new Promise(resolve => setTimeout(resolve, 5000));
+              }
+            }
+          } else {
+            // Normal step execution
+            setCurrentStatus(language === 'de'
+              ? `Generiere Schritt ${step} von ${endStep}...`
+              : `Generating step ${step} of ${endStep}...`);
 
             const timeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error('Partner timeout')), 180000);
+              setTimeout(() => reject(new Error('Step timeout')), 1200000);
             });
 
             const { newState } = await Promise.race([
-              executeStep(currentLocalState, 2, language, setCurrentStatus, partnerIdx),
+              executeStep(currentLocalState, step, language, setCurrentStatus),
               timeoutPromise
             ]);
 
             currentLocalState = newState;
             setPipelineState(newState);
-
-            // Short pause between partners
-            if (partnerIdx < partnerCount - 1) {
-              await new Promise(resolve => setTimeout(resolve, 5000));
-            }
           }
-        } else {
-          // Normal step execution
+
+          // Auto-save after each step
+          saveGeneratorStateToProject(currentLocalState);
+          stepSuccess = true;
+
+          // Update UI state
+          setIsGenerating(false);
           setCurrentStatus(language === 'de'
-            ? `Generiere Schritt ${step} von ${endStep}... Dies kann einige Minuten dauern.`
-            : `Generating step ${step} of ${endStep}... This may take a few minutes.`);
+            ? `✅ Schritt ${step}/${endStep} fertig. ${step < endStep ? 'Weiter...' : ''}`
+            : `✅ Step ${step}/${endStep} done. ${step < endStep ? 'Continuing...' : ''}`);
 
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Step timeout')), 1200000); // 20 min per step (WPs have 18 questions × 240s each)
-          });
+          // Robust delay between steps
+          if (step < endStep) {
+            await new Promise(resolve => setTimeout(resolve, 10000));
+          }
+        } catch (error) {
+          console.warn(`Pipeline error at step ${step} (retry ${retryCount})`, error);
+          const errorMsg = (error as Error).message;
 
-          const { newState } = await Promise.race([
-            executeStep(currentLocalState, step, language, setCurrentStatus),
-            timeoutPromise
-          ]);
+          if (retryCount < 1) {
+            retryCount++;
+            setCurrentStatus(language === 'de'
+              ? `⚠️ Fehler bei Schritt ${step}. Wiederholungsversuch in 15 Sekunden...`
+              : `⚠️ Error at step ${step}. Retrying in 15 seconds...`);
+            await new Promise(resolve => setTimeout(resolve, 15000));
+            continue; // Retry the step
+          }
 
-          currentLocalState = newState;
-          setPipelineState(newState);
+          // After retry failed: save progress and stop
+          saveGeneratorStateToProject(currentLocalState);
+
+          if (errorMsg.includes('timeout')) {
+            setCurrentStatus(language === 'de'
+              ? `❌ Zeitüberschreitung bei Schritt ${step}. Fortschritt gespeichert — bitte manuell fortsetzen.`
+              : `❌ Timeout at step ${step}. Progress saved — please continue manually.`);
+          } else {
+            setCurrentStatus(language === 'de'
+              ? `❌ Fehler bei Schritt ${step}: ${errorMsg}. Fortschritt gespeichert.`
+              : `❌ Error at step ${step}: ${errorMsg}. Progress saved.`);
+          }
+          setIsGenerating(false);
+          setIsAutoRunning(false);
+          return; // Exit function
         }
-
-        // Update UI state
-        setIsGenerating(false);
-        setCurrentStatus(language === 'de'
-          ? `Schritt ${step} fertiggestellt. Warte auf nächsten Schritt...`
-          : `Step ${step} completed. Waiting for next step...`);
-
-        // Force a robust delay between steps
-        await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds pause
-      } catch (error) {
-        console.warn('Pipeline stopped due to error at step', step, error);
-        const errorMsg = (error as Error).message;
-        if (errorMsg.includes('timeout')) {
-          setCurrentStatus(language === 'de'
-            ? `Zeitüberschreitung bei Schritt ${step}. Bitte einzeln erneut versuchen.`
-            : `Timeout at step ${step}. Please try again individually.`);
-        } else {
-          setCurrentStatus(language === 'de'
-            ? `Fehler bei Schritt ${step}: ${errorMsg}. Prozess pausiert.`
-            : `Error at step ${step}: ${errorMsg}. Process paused.`);
-        }
-        setIsGenerating(false);
-        break; // Stop execution on error
       }
     }
 
-    // After completing steps 1-5, show message about WPs
-    if (currentLocalState.currentStep >= 5) {
+    // All steps completed or cancelled
+    setIsGenerating(false);
+    setIsAutoRunning(false);
+
+    if (!autoRunCancelledRef.current && currentLocalState.currentStep >= endStep) {
+      const elapsed = Math.round((Date.now() - autoRunStartTimeRef.current) / 60000);
       setCurrentStatus(language === 'de'
-        ? '✅ Grundlagen fertig! Bitte generieren Sie nun die Arbeitspakete einzeln.'
-        : '✅ Basics complete! Please generate work packages individually now.');
+        ? `🎉 Antrag vollständig generiert! (${elapsed} Min.)`
+        : `🎉 Application fully generated! (${elapsed} min.)`);
     }
   };
 
@@ -3619,8 +3711,55 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
         </div>
       </div>
 
-      {/* Current Status */}
-      {isGenerating && currentStatus && (
+      {/* Auto-Run Progress Banner */}
+      {isAutoRunning && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
+              <div>
+                <p className="font-semibold text-blue-900">
+                  {language === 'de' ? 'Vollautomatische Generierung' : 'Full Auto-Generation'}
+                </p>
+                <p className="text-sm text-blue-700">{currentStatus}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1 text-xs text-blue-600">
+                <Timer className="h-3.5 w-3.5" />
+                <span>
+                  {Math.round((Date.now() - autoRunStartTimeRef.current) / 60000)} Min.
+                </span>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => { autoRunCancelledRef.current = true; }}
+              >
+                <Square className="h-4 w-4 mr-1" />
+                {language === 'de' ? 'Stoppen' : 'Stop'}
+              </Button>
+            </div>
+          </div>
+          {/* Step progress bar */}
+          <div className="flex items-center gap-1">
+            {Array.from({ length: PIPELINE_STEPS.length }, (_, i) => (
+              <div key={i} className={`h-2 flex-1 rounded-full transition-colors ${
+                i + 1 < (pipelineState?.currentStep || 0) ? 'bg-emerald-500' :
+                i + 1 === (pipelineState?.currentStep || 0) ? 'bg-blue-500 animate-pulse' :
+                'bg-gray-200'
+              }`} />
+            ))}
+          </div>
+          <div className="flex justify-between text-xs text-blue-600 mt-1">
+            <span>{language === 'de' ? 'Schritt' : 'Step'} {pipelineState.currentStep}/{PIPELINE_STEPS.length}</span>
+            <span>{Math.round((pipelineState.currentStep / PIPELINE_STEPS.length) * 100)}%</span>
+          </div>
+        </div>
+      )}
+
+      {/* Current Status (non auto-run) */}
+      {isGenerating && !isAutoRunning && currentStatus && (
         <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl text-[#003399]">
           <RefreshCw className="h-5 w-5 animate-spin" />
           <span className="font-medium">{currentStatus}</span>
@@ -3630,20 +3769,22 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
       {/* Main Action Bar */}
       <div className="bg-white border rounded-xl p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
-          {/* All Steps Button - Only for steps 1-5 */}
-          {!isGenerating && pipelineState.currentStep < 5 && (
+          {/* Full Auto-Run Button */}
+          {!isGenerating && !isAutoRunning && pipelineState.currentStep < PIPELINE_STEPS.length && (
             <Button
               onClick={handleExecuteAll}
               size="lg"
               className="bg-gradient-to-r from-[#003399] to-[#0055cc] hover:from-[#002266] hover:to-[#004499] text-white shadow-lg"
             >
               <Zap className="h-5 w-5 mr-2" />
-              {language === 'de' ? '⚡ Grundlagen generieren (1-5)' : '⚡ Generate Basics (1-5)'}
+              {pipelineState.currentStep === 0
+                ? (language === 'de' ? '⚡ Alles generieren' : '⚡ Generate All')
+                : (language === 'de' ? '⚡ Restliche Schritte generieren' : '⚡ Generate Remaining')}
             </Button>
           )}
 
-          {/* Next Step Button */}
-          {pipelineState.currentStep < PIPELINE_STEPS.length && !isGenerating && (
+          {/* Next Step Button (manual single-step) */}
+          {pipelineState.currentStep < PIPELINE_STEPS.length && !isGenerating && !isAutoRunning && (
             <Button
               onClick={() => handleExecuteStep(pipelineState.currentStep + 1)}
               variant="outline"
@@ -3656,8 +3797,8 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
             </Button>
           )}
 
-          {/* Generating indicator */}
-          {isGenerating && (
+          {/* Generating indicator (non auto-run) */}
+          {isGenerating && !isAutoRunning && (
             <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 rounded-lg text-[#003399]">
               <RefreshCw className="h-5 w-5 animate-spin" />
               <span className="font-medium">{currentStatus || 'Generiert...'}</span>

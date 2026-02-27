@@ -29,6 +29,8 @@ import {
   Command,
   Lightbulb,
   BookmarkPlus,
+  Calculator,
+  FilePen,
 } from "lucide-react";
 import { useLanguageStore } from "@/store/language-store";
 import { useAppStore } from "@/store/app-store";
@@ -74,6 +76,7 @@ const getNavStructure = (language: Language) => ({
       description: language === 'de' ? "Projektanträge" : "Project applications",
       subItems: [
         { href: "/projects", label: language === 'de' ? "Alle Projekte" : "All Projects", icon: FolderKanban },
+        { href: "/projects?tab=drafts", label: language === 'de' ? "Entwürfe" : "Drafts", icon: FilePen },
         { href: "/projects/new", label: language === 'de' ? "Konzeptentwickler" : "Concept Developer", icon: Lightbulb },
       ]
     },
@@ -101,6 +104,12 @@ const getNavStructure = (language: Language) => ({
   ],
   tools: [
     {
+      href: "/budget",
+      label: language === 'de' ? "Budget-Rechner" : "Budget Calculator",
+      icon: Calculator,
+      description: language === 'de' ? "Lump-Sum Budgettabelle" : "Lump-Sum Budget Table"
+    },
+    {
       href: "/export",
       label: t("export", language),
       icon: FileOutput,
@@ -123,6 +132,7 @@ const getBreadcrumbs = (pathname: string, language: Language) => {
     'new': t('newProject', language),
     'smart-import': t('smartImport', language),
     'import': 'Import',
+    'budget': language === 'de' ? 'Budget-Rechner' : 'Budget Calculator',
   };
 
   let currentPath = '';
