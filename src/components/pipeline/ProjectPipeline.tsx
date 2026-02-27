@@ -898,7 +898,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
                 : `Step 2: Partner ${partnerIdx + 1}/${partnerCount} — ${partner.name}...`);
 
               const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error('Partner timeout')), 300000); // 5 min per partner
+                setTimeout(() => reject(new Error('Partner timeout')), 600000); // 10 min per partner (includes internal retries)
               });
 
               const { newState } = await Promise.race([
@@ -909,12 +909,28 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
               currentLocalState = newState;
               setPipelineState(newState);
 
+              // Check if any answers for this partner failed
+              const partnerAnswerKeys = ['org_presentation', 'org_experience', 'org_past_participation'];
+              const failedCount = partnerAnswerKeys.filter(key => {
+                const ans = newState.answers?.[`${key}_${partner.id}`];
+                const val = typeof ans === 'object' && 'value' in ans ? ans.value : (typeof ans === 'string' ? ans : '');
+                return !val || val.length < 50 || val.includes('konnte nicht generiert') || val.includes('could not be generated');
+              }).length;
+
+              if (failedCount > 0) {
+                setCurrentStatus(language === 'de'
+                  ? `⚠️ ${failedCount} von 3 Antworten fuer ${partner.name} fehlgeschlagen. Werden intern automatisch wiederholt...`
+                  : `⚠️ ${failedCount} of 3 answers for ${partner.name} failed. Internal auto-retry in progress...`);
+              }
+
               // Save after each partner
               saveGeneratorStateToProject(newState);
 
               if (partnerIdx < partnerCount - 1) {
+                // Longer cooldown if answers failed (rate limit likely)
+                const cooldown = failedCount > 0 ? DELAY_BETWEEN_PARTNERS + 60 : DELAY_BETWEEN_PARTNERS;
                 await waitWithCountdown(
-                  DELAY_BETWEEN_PARTNERS,
+                  cooldown,
                   language === 'de'
                     ? `⏳ Warte vor Partner ${partnerIdx + 2}/${partnerCount} (API-Cooldown)`
                     : `⏳ Waiting before partner ${partnerIdx + 2}/${partnerCount} (API cooldown)`,

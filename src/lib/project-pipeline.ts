@@ -748,33 +748,50 @@ async function generateSectionAnswersSequentially(
     console.log(`[generateSectionAnswersSequentially] Question ${i + 1}/${questions.length}: ${q.id}`);
     onQuestionProgress?.(q.id, i + 1, questions.length);
 
-    try {
-      // Generate single answer using the existing function
-      const answerData = await generateSingleAnswerForSection(
-        state,
-        q,
-        section,
-        chapter,
-        language,
-        extraContext
-      );
+    // Retry logic: up to 3 attempts per question
+    let generated = false;
+    for (let attempt = 1; attempt <= 3 && !generated; attempt++) {
+      try {
+        const answerData = await generateSingleAnswerForSection(
+          state,
+          q,
+          section,
+          chapter,
+          language,
+          extraContext
+        );
 
-      results[q.id] = answerData.value;
+        // Validate response is meaningful
+        if (!answerData.value || answerData.value.trim().length < 30) {
+          console.warn(`[generateSectionAnswersSequentially] Answer too short for ${q.id} (attempt ${attempt})`);
+          if (attempt < 3) {
+            const waitSec = attempt * 45; // 45s, 90s
+            console.log(`[generateSectionAnswersSequentially] Waiting ${waitSec}s before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitSec * 1000));
+            continue;
+          }
+        }
 
-      // Delay between questions to avoid 429 rate limiting
-      // Longer delay for WP sections (many sequential questions)
-      if (i < questions.length - 1) {
-        const delay = questions.length > 4 ? 2000 : 1000; // 2s for large sections, 1s for small
-        await new Promise(resolve => setTimeout(resolve, delay));
+        results[q.id] = answerData.value;
+        generated = true;
+
+        // Delay between questions to avoid 429 rate limiting
+        if (i < questions.length - 1) {
+          const delay = questions.length > 4 ? 5000 : 3000; // 5s for large sections, 3s for small
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } catch (e: any) {
+        console.error(`[generateSectionAnswersSequentially] Error for ${q.id} (attempt ${attempt}/3):`, e.message);
+        const isRateLimit = e.message?.includes('429') || e.message?.includes('Resource exhausted') || e.message?.includes('rate') || e.message?.includes('quota');
+
+        if (attempt < 3) {
+          const waitSec = isRateLimit ? attempt * 90 : attempt * 45; // Rate limit: 90s, 180s; Other: 45s, 90s
+          console.log(`[generateSectionAnswersSequentially] ${isRateLimit ? 'Rate limit' : 'Error'} — waiting ${waitSec}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitSec * 1000));
+          continue;
+        }
+        results[q.id] = ''; // All retries exhausted
       }
-    } catch (e: any) {
-      console.error(`[generateSectionAnswersSequentially] Error for question ${q.id}:`, e.message);
-      // If rate limited, wait longer before continuing to next question
-      if (e.message?.includes('429') || e.message?.includes('Resource exhausted')) {
-        console.log(`[generateSectionAnswersSequentially] Rate limited — waiting 10s before next question...`);
-        await new Promise(resolve => setTimeout(resolve, 10000));
-      }
-      results[q.id] = ''; // Empty answer, user can regenerate
     }
   }
 
@@ -2215,25 +2232,59 @@ ${instruction ? '- Folge der BENUTZER-ANWEISUNG!' : ''}
 
 Schreibe in ${LANGUAGE_NAMES[language as Language] || language}.`;
 
-  try {
-    const response = await callGeminiForPipeline(prompt, systemContext, 0.5);
-    console.log(`[generateSinglePartnerAnswer] Generated for ${partnerData.name} (${response.length} chars)`);
+  // Retry logic: up to 3 attempts with increasing cooldown
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await callGeminiForPipeline(prompt, systemContext, 0.5);
+      console.log(`[generateSinglePartnerAnswer] Generated for ${partnerData.name} (${response.length} chars, attempt ${attempt})`);
 
-    return {
-      value: response.trim(),
-      mode: 'ai',
-      lastEditedAt: new Date().toISOString()
-    };
-  } catch (e: any) {
-    console.error(`[generateSinglePartnerAnswer] Error:`, e.message);
-    return {
-      value: language === 'de'
-        ? '*Antwort konnte nicht generiert werden. Bitte manuell ausfüllen.*'
-        : '*Answer could not be generated. Please fill in manually.*',
-      mode: 'ai',
-      lastEditedAt: new Date().toISOString()
-    };
+      // Validate response is meaningful (not empty or too short)
+      if (!response || response.trim().length < 50) {
+        console.warn(`[generateSinglePartnerAnswer] Response too short (${response?.length || 0} chars) for ${partnerData.name}, attempt ${attempt}`);
+        if (attempt < MAX_RETRIES) {
+          const waitSec = attempt * 60; // 60s, 120s
+          console.log(`[generateSinglePartnerAnswer] Waiting ${waitSec}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitSec * 1000));
+          continue;
+        }
+      }
+
+      return {
+        value: response.trim(),
+        mode: 'ai',
+        lastEditedAt: new Date().toISOString()
+      };
+    } catch (e: any) {
+      console.error(`[generateSinglePartnerAnswer] Error (attempt ${attempt}/${MAX_RETRIES}):`, e.message);
+      const isRateLimit = e.message?.includes('429') || e.message?.includes('rate') || e.message?.includes('Rate') || e.message?.includes('quota');
+
+      if (attempt < MAX_RETRIES) {
+        const waitSec = isRateLimit ? attempt * 120 : attempt * 60; // Rate limit: 2min, 4min; Other: 1min, 2min
+        console.log(`[generateSinglePartnerAnswer] ${isRateLimit ? 'Rate limit' : 'Error'} — waiting ${waitSec}s before retry ${attempt + 1}/${MAX_RETRIES}...`);
+        await new Promise(resolve => setTimeout(resolve, waitSec * 1000));
+        continue;
+      }
+
+      // All retries exhausted
+      return {
+        value: language === 'de'
+          ? '*Antwort konnte nicht generiert werden. Bitte manuell ausfüllen.*'
+          : '*Answer could not be generated. Please fill in manually.*',
+        mode: 'ai',
+        lastEditedAt: new Date().toISOString()
+      };
+    }
   }
+
+  // Should never reach here, but TypeScript safety
+  return {
+    value: language === 'de'
+      ? '*Antwort konnte nicht generiert werden. Bitte manuell ausfüllen.*'
+      : '*Answer could not be generated. Please fill in manually.*',
+    mode: 'ai',
+    lastEditedAt: new Date().toISOString()
+  };
 }
 
 
