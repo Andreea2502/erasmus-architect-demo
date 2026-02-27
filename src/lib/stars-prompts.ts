@@ -987,16 +987,17 @@ TASK: Assemble a complete STARS Expose document in Markdown following this EXACT
 
 ### Section 1: Project Identification
 
-Create a Markdown table with the following rows:
-| Field | Value |
-|-------|-------|
-| Project Title | ${projectTitle} |
-| Acronym | ${projectAcronym} |
-| Action Type | ${actionType} |
-| Sector | ${sector} |
-| Duration | ${duration} months |
-| Budget | ${budget.toLocaleString()} EUR |
-| European Policy Alignment | ${euPolicyAlignment.join(', ')} |
+Create a Markdown identification table with NO visible header row (use empty headers). Bold labels in the left column. Use this EXACT format:
+
+| | |
+|:--|:--|
+| **Project Title** | ${projectTitle} |
+| **Acronym** | ${projectAcronym} |
+| **Action Type** | ${actionType} |
+| **Sector** | ${sector} |
+| **Duration** | ${duration} months |
+| **Budget** | ${budget.toLocaleString()} EUR |
+| **European Policy Alignment** | ${euPolicyAlignment.join(', ')} |
 
 ---
 
@@ -1006,7 +1007,12 @@ Create a Markdown table with the following rows:
 Insert the partnership narrative as flowing prose. Lightly edit for smooth transitions with the rest of the document, but preserve the substance.
 
 #### 2.2 Consortium Overview
-Insert the partners table data formatted as a clean Markdown table with columns: Role, Organization, Country, Expertise.
+Insert the partners table data as a clean Markdown table with left-aligned columns. Use this structure:
+
+| Role | Organization | Country | Key Expertise |
+|:-----|:------------|:--------|:-------------|
+
+Fill each row with the partner data. Keep the "Key Expertise" column concise (max 8 words per partner).
 
 #### 2.3 Associated Partners
 If associated partners exist, present them. If none, omit this subsection.

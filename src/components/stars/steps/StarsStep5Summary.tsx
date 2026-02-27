@@ -58,35 +58,168 @@ export function StarsStep5Summary({ exportToPipeline }: StarsStep5SummaryProps) 
                 <head>
                     <title>${displayAcronym || displayTitle || 'STARS Expose'} - STARS Expose</title>
                     <style>
+                        /* === BASE === */
                         body {
                             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                             max-width: 800px;
                             margin: 0 auto;
                             padding: 40px;
-                            line-height: 1.6;
+                            line-height: 1.65;
                             color: #1e293b;
+                            font-size: 14px;
                         }
-                        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-                        th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; vertical-align: top; }
-                        th { background: #003399; color: white; }
-                        /* Hide empty header rows in label-value tables (Goals, Target Groups) */
-                        thead tr th:empty { background: none; border: none; padding: 0; height: 0; font-size: 0; line-height: 0; }
+
+                        /* === HEADINGS === */
+                        h1 { font-size: 1.8em; color: #003399; border-bottom: 3px solid #003399; padding-bottom: 0.4em; margin-bottom: 0.2em; }
+                        h2 { font-size: 1.3em; color: #64748b; font-weight: 400; margin-top: 0.2em; margin-bottom: 1.2em; }
+                        h3 {
+                            font-size: 1.15em;
+                            color: #003399;
+                            margin-top: 2.2em;
+                            margin-bottom: 0.8em;
+                            padding-bottom: 0.35em;
+                            border-bottom: 2px solid #e2e8f0;
+                            text-transform: uppercase;
+                            letter-spacing: 0.03em;
+                            font-weight: 700;
+                        }
+                        h4 {
+                            font-size: 0.95em;
+                            margin-top: 1.6em;
+                            margin-bottom: 0;
+                            color: #ffffff;
+                            background: #1e3a8a;
+                            padding: 0.5em 0.9em;
+                            border-radius: 6px 6px 0 0;
+                            font-weight: 600;
+                            letter-spacing: 0.01em;
+                        }
+
+                        /* === ALL TABLES — BASE === */
+                        table {
+                            width: 100%;
+                            border-collapse: separate;
+                            border-spacing: 0;
+                            margin: 0 0 1.2em 0;
+                            border: 1px solid #cbd5e1;
+                            border-radius: 0 0 6px 6px;
+                            overflow: hidden;
+                            font-size: 0.93em;
+                        }
+                        th, td {
+                            padding: 10px 16px;
+                            text-align: left;
+                            vertical-align: top;
+                            border-bottom: 1px solid #e2e8f0;
+                        }
+                        tr:last-child td { border-bottom: none; }
+
+                        /* Header row for data tables (consortium) */
+                        th {
+                            background: #1e3a8a;
+                            color: #ffffff;
+                            font-weight: 600;
+                            font-size: 0.85em;
+                            letter-spacing: 0.04em;
+                            text-transform: uppercase;
+                            padding: 11px 16px;
+                        }
+
+                        /* === HIDE EMPTY HEADERS (mini-tables: identification, goals, target groups) === */
+                        thead tr th:empty {
+                            background: none; border: none; padding: 0; height: 0;
+                            font-size: 0; line-height: 0; overflow: hidden;
+                        }
                         thead:has(th:empty) { display: none; }
-                        /* Label column styling for 2-column key-value tables */
-                        td:first-child { width: 180px; min-width: 160px; font-weight: 500; color: #334155; background: #f8fafc; }
+
+                        /* === MINI-TABLE LABEL/VALUE COLUMN STYLING (default for all tables) === */
+                        td:first-child {
+                            width: 200px;
+                            min-width: 170px;
+                            font-weight: 600;
+                            font-size: 0.88em;
+                            color: #1e3a8a;
+                            background: #eff6ff;
+                            border-right: 1px solid #dbeafe;
+                        }
                         td:last-child { width: auto; }
-                        /* Restore full-width columns for data tables (Section 1 identification table) */
-                        table:first-of-type td:first-child { width: auto; background: transparent; }
-                        h1, h2, h3, h4 { color: #003399; }
-                        h1 { font-size: 1.8em; border-bottom: 2px solid #003399; padding-bottom: 0.5em; }
-                        h2 { font-size: 1.4em; margin-top: 1.5em; }
-                        h3 { font-size: 1.15em; }
-                        h4 { font-size: 1.05em; margin-top: 1.2em; margin-bottom: 0.3em; border-left: 3px solid #003399; padding-left: 0.5em; }
+                        tr:nth-child(odd) td:last-child { background: #ffffff; }
+                        tr:nth-child(even) td:last-child { background: #f8fafc; }
+
+                        /* Tight coupling: h4 heading flows directly into its table */
+                        h4 + table { margin-top: 0; border-top: none; border-radius: 0 0 6px 6px; }
+
+                        /* h4 NOT immediately before a table — reset to inline accent style */
+                        h4:not(:has(+ table)) {
+                            background: none;
+                            color: #1e3a8a;
+                            border-radius: 0;
+                            padding: 0.3em 0 0.3em 0.7em;
+                            border-left: 4px solid #2563eb;
+                            margin-bottom: 0.5em;
+                        }
+
+                        /* === SECTION 1: IDENTIFICATION TABLE (1st table) === */
+                        table:nth-of-type(1) {
+                            border: 2px solid #1e3a8a;
+                            border-radius: 6px;
+                            margin-top: 1em;
+                        }
+                        table:nth-of-type(1) td:first-child {
+                            width: 230px;
+                            background: #1e3a8a;
+                            color: #ffffff;
+                            font-weight: 600;
+                            border-right: 1px solid #2545a0;
+                            font-size: 0.9em;
+                        }
+                        table:nth-of-type(1) td:last-child { font-weight: 500; color: #0f172a; }
+                        table:nth-of-type(1) tr:nth-child(odd) td:last-child { background: #ffffff; }
+                        table:nth-of-type(1) tr:nth-child(even) td:last-child { background: #f1f5f9; }
+
+                        /* === SECTION 2: CONSORTIUM TABLE (2nd table, has visible headers) === */
+                        table:nth-of-type(2) {
+                            border-radius: 6px;
+                            margin-top: 1em;
+                            border: 1px solid #cbd5e1;
+                        }
+                        table:nth-of-type(2) td:first-child {
+                            width: auto;
+                            min-width: auto;
+                            background: transparent;
+                            color: #1e293b;
+                            font-weight: 600;
+                            border-right: none;
+                            font-size: 0.93em;
+                        }
+                        table:nth-of-type(2) td { border-right: none; }
+                        table:nth-of-type(2) tr:nth-child(odd) td { background: #ffffff; }
+                        table:nth-of-type(2) tr:nth-child(even) td { background: #f1f5f9; }
+
+                        /* === HORIZONTAL RULES === */
+                        hr { border: none; border-top: 1px solid #e2e8f0; margin: 2em 0; }
+
+                        /* === CONTENT ELEMENTS === */
                         ul, ol { padding-left: 1.5em; }
-                        blockquote { border-left: 3px solid #003399; padding-left: 1em; color: #475569; margin: 1em 0; }
+                        li { margin-bottom: 0.3em; }
+                        li strong { color: #1e3a8a; }
+                        blockquote {
+                            border-left: 4px solid #2563eb;
+                            padding: 0.7em 1em;
+                            color: #475569;
+                            margin: 1em 0;
+                            background: #f8fafc;
+                            border-radius: 0 6px 6px 0;
+                        }
+                        strong { color: #0f172a; }
+                        p { margin: 0.6em 0; }
+
+                        /* === PRINT === */
                         @media print {
                             body { padding: 0; }
                             @page { margin: 2cm; }
+                            table { break-inside: avoid; }
+                            h4 { break-after: avoid; }
                         }
                     </style>
                 </head>
