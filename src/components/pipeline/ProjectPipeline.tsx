@@ -107,7 +107,7 @@ import { WP_TEMPLATES, getRecommendedWPStructure, validateWPAssignment, type WPT
 import { WorkPackageConfigurator, type WPConfiguration } from '@/components/pipeline/WorkPackageConfigurator';
 import { WPBudgetConfigurator, type WPBudgetConfig } from '@/components/pipeline/WPBudgetConfigurator';
 import { ProposalEvaluator } from '@/components/pipeline/ProposalEvaluator';
-import { PartnerSkillsMatrix } from '@/components/pipeline/PartnerSkillsMatrix';
+// PartnerSkillsMatrix removed — expertise tags were inaccurate and had no effect on generation
 
 // ============================================================================
 // MAIN COMPONENT
@@ -1625,14 +1625,6 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
 
       return (
         <div className="space-y-6">
-          {/* Partner Skills Matrix for Execution Phase (Step 2) */}
-          <div className="mb-6">
-            <PartnerSkillsMatrix
-              partners={pipelineState.consortium}
-              language={language}
-            />
-          </div>
-
           {pipelineState.consortium.map((partner, partnerIndex) => {
             const isPartnerExpanded = expandedSections[`partner_${partner.id}`] !== false; // Default expanded
 
@@ -4056,8 +4048,38 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
       {/* Pipeline Steps */}
       <div className="space-y-3">
         {(pipelineState ? getPipelineSteps(pipelineState.configuration?.wpCount || 5) : PIPELINE_STEPS).map((step) => {
-          const isCompleted = pipelineState.currentStep >= step.id;
-          const isCurrent = pipelineState.currentStep + 1 === step.id;
+          // Check if step was actually completed WITH content (not just step counter advanced)
+          const stepReached = pipelineState.currentStep >= step.id;
+          const currentActionType = pipelineState.configuration?.actionType || actionType || 'KA220';
+          const hasActualContent = (() => {
+            if (!stepReached) return false;
+            // Verify that the step generated real content, not just an empty API response
+            switch (step.id) {
+              case 1: // Context
+                return !!(pipelineState.answers?.projectTitle || pipelineState.projectTitle);
+              case 2: // Organisations
+                return Object.keys(pipelineState.answers || {}).some(k => k.startsWith('org_'));
+              case 3: // Relevance
+                return !!(pipelineState.needsAnalysis?.problemStatement || pipelineState.objectives?.generalObjective);
+              case 4: // Partnership (KA220) or WPs (KA210)
+                if (currentActionType === 'KA210') {
+                  return (pipelineState.workPackages?.length || 0) > 0;
+                }
+                return Object.keys(pipelineState.answers || {}).some(k => k.startsWith('partnership'));
+              case 5: // Impact
+                return !!(pipelineState.impact?.expectedImpact || pipelineState.dissemination?.strategy);
+              case 6: // WPs (KA220)
+                return (pipelineState.workPackages?.length || 0) > 0;
+              case 7: // Summary
+                return !!pipelineState.executiveSummary;
+              case 8: // Final Evaluation
+                return (pipelineState.evaluatorFeedback || []).some((e: { step: number }) => e.step === 8);
+              default:
+                return true;
+            }
+          })();
+          const isCompleted = stepReached && hasActualContent;
+          const isCurrent = pipelineState.currentStep + 1 === step.id || (stepReached && !hasActualContent);
           const evaluation = pipelineState.evaluatorFeedback?.find((e) => e.step === step.id);
           const isExpanded = expandedStep === step.id;
 
