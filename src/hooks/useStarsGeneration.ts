@@ -56,8 +56,22 @@ function cleanJsonResponse(text: string): string {
 function buildSourceContext(sources: ResearchSource[]): string {
     return sources
         .filter(s => s.isAnalyzed)
-        .map(s => `QUELLE "${s.title}":\n${s.summary}\nErkenntnisse: ${s.keyFindings?.join('; ')}`)
-        .join('\n\n');
+        .map(s => {
+            const citation = s.sourceInfo
+                ? `(${[s.sourceInfo.authors, s.sourceInfo.institution, s.sourceInfo.year].filter(Boolean).join(', ')})`
+                : '';
+            const statsBlock = s.statistics && s.statistics.length > 0
+                ? `\nSTATISTIKEN & DATEN:\n${s.statistics.map(st => `  - ${st.metric}: ${st.value} ${st.context ? `(${st.context})` : ''} ${st.citation ? `[${st.citation}]` : ''}`).join('\n')}`
+                : '';
+            const quotesBlock = s.quotableData && s.quotableData.length > 0
+                ? `\nZITIERBARE EVIDENZ:\n${s.quotableData.map(q => `  - "${q}"`).join('\n')}`
+                : '';
+            const findingsBlock = s.keyFindings && s.keyFindings.length > 0
+                ? `\nKERNERKENNTNISSE:\n${s.keyFindings.map(f => `  - ${f}`).join('\n')}`
+                : '';
+            return `QUELLE: "${s.title}" ${citation}\n${s.summary || ''}${statsBlock}${quotesBlock}${findingsBlock}`;
+        })
+        .join('\n\n---\n\n');
 }
 
 // ============================================================================
@@ -157,23 +171,51 @@ export function useStarsGeneration() {
         ));
 
         try {
-            const prompt = `Analysiere diese Forschungsquelle und extrahiere die wichtigsten Erkenntnisse.
+            const prompt = `Du bist ein Forschungsanalyst der Quellen für einen EU-Förderantrag (Erasmus+) aufbereitet.
+Deine Aufgabe: Extrahiere NUR harte Fakten, Zahlen, Statistiken und zitierbare Evidenz aus dieser Quelle.
+Allgemeine Beschreibungen, Einleitungen und Kontextinformationen sind NICHT relevant — nur konkrete Daten.
 
 QUELLE: "${source.title}"
 
-INHALT:
-${source.content.substring(0, 10000)}
+INHALT (gekürzt):
+${source.content.substring(0, 25000)}
 
-Antworte im JSON-Format:
+EXTRAHIERE folgende Informationen im JSON-Format:
+
 {
-  "summary": "Kurze Zusammenfassung (3-4 Sätze)",
-  "keyFindings": ["Erkenntnis 1", "Erkenntnis 2", "Erkenntnis 3", "Erkenntnis 4", "Erkenntnis 5"]
-}`;
+  "sourceInfo": {
+    "authors": "Autor(en) oder 'Unbekannt' falls nicht erkennbar",
+    "year": "Erscheinungsjahr oder 'k.A.'",
+    "institution": "Herausgebende Institution (z.B. OECD, CEDEFOP, Eurostat, Universität) oder 'k.A.'"
+  },
+  "summary": "2-3 Sätze: Worum geht es in der Quelle, und was ist die KERNAUSSAGE für einen Erasmus+ Antrag?",
+  "statistics": [
+    {
+      "metric": "Was wird gemessen (z.B. 'Anteil digital ausgeschlossener Lehrkräfte')",
+      "value": "Konkreter Zahlenwert (z.B. '47%', '3.2 Millionen', '1 von 4')",
+      "context": "Kontext: welches Land/Region, welcher Zeitraum, welche Stichprobe",
+      "citation": "Kurzreferenz (z.B. 'OECD TALIS 2023', 'Eurostat 2022')"
+    }
+  ],
+  "quotableData": [
+    "Direkt zitierbare Sätze mit konkreten Daten, Zahlen oder Ergebnissen (max 5). Jeder Satz muss eine ZAHL oder ein konkretes ERGEBNIS enthalten."
+  ],
+  "keyFindings": [
+    "3-5 Kernerkenntnisse die für einen Erasmus+ Antrag relevant sind. Jede Erkenntnis MUSS einen konkreten Bezugspunkt haben (Zahl, Land, Zielgruppe, Methode)."
+  ]
+}
+
+REGELN:
+- "statistics": Extrahiere ALLE Zahlen, Prozentangaben, Metriken aus der Quelle. Minimum 3, wenn möglich mehr.
+- "quotableData": Nur Sätze die eine konkrete Zahl, ein Studienergebnis oder einen messbaren Befund enthalten.
+- "keyFindings": Keine vagen Aussagen wie "Digitalisierung ist wichtig". Nur Erkenntnisse mit konkretem Bezug.
+- Wenn die Quelle wenig Daten enthält (z.B. ein Policy-Dokument), extrahiere stattdessen konkrete Empfehlungen und Frameworks mit Referenznummern/Bezeichnungen.
+- Antworte NUR mit validem JSON.`;
 
             const response = await generateContentAction(
                 prompt,
-                'Du bist ein Forschungsanalyst. Antworte NUR im JSON-Format.',
-                0.7,
+                'Du bist ein Forschungsanalyst für EU-Förderanträge. Extrahiere harte Fakten und Daten. Antworte NUR im JSON-Format.',
+                0.3,
                 45000
             );
             const clean = cleanJsonResponse(response);
@@ -184,6 +226,9 @@ Antworte im JSON-Format:
                     ...s,
                     summary: parsed.summary,
                     keyFindings: parsed.keyFindings,
+                    statistics: parsed.statistics,
+                    quotableData: parsed.quotableData,
+                    sourceInfo: parsed.sourceInfo,
                     isAnalyzed: true,
                     isAnalyzing: false,
                 } : s

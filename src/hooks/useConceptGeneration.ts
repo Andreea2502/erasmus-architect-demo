@@ -49,20 +49,52 @@ export function useConceptGeneration() {
     const runAnalysis = async (sourceId: string, title: string, content: string) => {
         store.updateField('sources', store.sources.map(s => s.id === sourceId ? { ...s, isAnalyzing: true, error: undefined } : s));
         try {
-            const prompt = `Analysiere diese Forschungsquelle und extrahiere die wichtigsten Erkenntnisse.
+            const prompt = `Du bist ein Forschungsanalyst der Quellen für einen EU-Förderantrag (Erasmus+) aufbereitet.
+Deine Aufgabe: Extrahiere NUR harte Fakten, Zahlen, Statistiken und zitierbare Evidenz aus dieser Quelle.
+Allgemeine Beschreibungen und Einleitungen sind NICHT relevant — nur konkrete Daten.
 
 QUELLE: "${title}"
 
-INHALT:
-${content.substring(0, 10000)}
+INHALT (gekürzt):
+${content.substring(0, 25000)}
 
-Antworte im JSON-Format:
+EXTRAHIERE folgende Informationen im JSON-Format:
+
 {
-  "summary": "Kurze Zusammenfassung (3-4 Sätze)",
-  "keyFindings": ["Erkenntnis 1", "Erkenntnis 2", "Erkenntnis 3", "Erkenntnis 4", "Erkenntnis 5"]
-}`;
+  "sourceInfo": {
+    "authors": "Autor(en) oder 'Unbekannt'",
+    "year": "Erscheinungsjahr oder 'k.A.'",
+    "institution": "Herausgebende Institution oder 'k.A.'"
+  },
+  "summary": "2-3 Sätze: Kernaussage für einen Erasmus+ Antrag",
+  "statistics": [
+    {
+      "metric": "Was wird gemessen",
+      "value": "Konkreter Zahlenwert",
+      "context": "Land/Region, Zeitraum, Stichprobe",
+      "citation": "Kurzreferenz"
+    }
+  ],
+  "quotableData": [
+    "Direkt zitierbare Sätze mit konkreten Daten oder Ergebnissen (max 5)"
+  ],
+  "keyFindings": [
+    "3-5 Kernerkenntnisse mit konkretem Bezugspunkt (Zahl, Land, Zielgruppe)"
+  ]
+}
 
-            const response = await generateContentAction(prompt, 'Du bist ein Forschungsanalyst. Antworte NUR im JSON-Format.', 0.7, 45000);
+REGELN:
+- "statistics": ALLE Zahlen, Prozentangaben, Metriken extrahieren. Minimum 3.
+- "quotableData": Nur Sätze mit einer Zahl, einem Studienergebnis oder messbaren Befund.
+- "keyFindings": Keine vagen Aussagen. Nur Erkenntnisse mit konkretem Bezug.
+- Antworte NUR mit validem JSON.`;
+
+            const response = await generateContentAction(
+                prompt,
+                'Du bist ein Forschungsanalyst für EU-Förderanträge. Extrahiere harte Fakten und Daten. Antworte NUR im JSON-Format.',
+                0.3,
+                45000
+            );
             const clean = response.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(clean);
 
@@ -70,6 +102,9 @@ Antworte im JSON-Format:
                 ...s,
                 summary: parsed.summary,
                 keyFindings: parsed.keyFindings,
+                statistics: parsed.statistics,
+                quotableData: parsed.quotableData,
+                sourceInfo: parsed.sourceInfo,
                 isAnalyzed: true,
                 isAnalyzing: false,
             } : s));
@@ -88,8 +123,22 @@ Antworte im JSON-Format:
         try {
             const sourceContext = store.sources
                 .filter(s => s.isAnalyzed)
-                .map(s => `QUELLE "${s.title}":\n${s.summary}\nErkenntnisse: ${s.keyFindings?.join('; ')}`)
-                .join('\n\n');
+                .map(s => {
+                    const citation = s.sourceInfo
+                        ? `(${[s.sourceInfo.authors, s.sourceInfo.institution, s.sourceInfo.year].filter(Boolean).join(', ')})`
+                        : '';
+                    const statsBlock = s.statistics && s.statistics.length > 0
+                        ? `\nSTATISTIKEN:\n${s.statistics.map((st: any) => `  - ${st.metric}: ${st.value} ${st.context ? `(${st.context})` : ''} ${st.citation ? `[${st.citation}]` : ''}`).join('\n')}`
+                        : '';
+                    const quotesBlock = s.quotableData && s.quotableData.length > 0
+                        ? `\nZITIERBARE EVIDENZ:\n${s.quotableData.map((q: string) => `  - "${q}"`).join('\n')}`
+                        : '';
+                    const findingsBlock = s.keyFindings && s.keyFindings.length > 0
+                        ? `\nKERNERKENNTNISSE:\n${s.keyFindings.map(f => `  - ${f}`).join('\n')}`
+                        : '';
+                    return `QUELLE: "${s.title}" ${citation}\n${s.summary || ''}${statsBlock}${quotesBlock}${findingsBlock}`;
+                })
+                .join('\n\n---\n\n');
 
             const allSourceContext = store.sources
                 .filter(s => !s.isAnalyzed && s.content)

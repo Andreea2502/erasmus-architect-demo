@@ -1,11 +1,26 @@
+export interface SourceStatistic {
+    metric: string;      // e.g., "dropout rate among rural youth"
+    value: string;       // e.g., "34.2%"
+    context: string;     // e.g., "across 12 EU member states, 2019-2022"
+    citation?: string;   // e.g., "CEDEFOP, 2023"
+}
+
 export interface ResearchSource {
     id: string;
     title: string;
     content: string;
     type: 'study' | 'report' | 'article' | 'other';
     fileType?: string;
+    // Analysis results — structured for citation in downstream prompts
     summary?: string;
     keyFindings?: string[];
+    statistics?: SourceStatistic[];       // Hard data: numbers, percentages, metrics
+    quotableData?: string[];              // Direct quotable passages with data/evidence
+    sourceInfo?: {                        // Citation metadata
+        authors?: string;
+        year?: string;
+        institution?: string;
+    };
     isAnalyzed: boolean;
     isAnalyzing: boolean;
     isExtracting: boolean;

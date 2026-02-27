@@ -128,6 +128,9 @@ export function StarsStep2Sources({
     };
 
     const analyzedCount = store.sources.filter(s => s.isAnalyzed).length;
+    const totalStats = store.sources.reduce(
+        (sum, s) => sum + (s.statistics?.length || 0), 0
+    );
     const totalFindings = store.sources.reduce(
         (sum, s) => sum + (s.keyFindings?.length || 0), 0
     );
@@ -292,22 +295,71 @@ export function StarsStep2Sources({
 
                                         {/* Analyzed */}
                                         {source.isAnalyzed && (
-                                            <div className="mt-2 bg-green-50 rounded-lg p-3">
-                                                <div className="flex items-center gap-1 text-green-700 text-xs font-semibold mb-1">
+                                            <div className="mt-2 bg-green-50 rounded-lg p-3 space-y-3">
+                                                <div className="flex items-center gap-1 text-green-700 text-xs font-semibold">
                                                     <CheckCircle2 className="h-3 w-3" />
                                                     Analysiert
                                                     <span className="text-gray-400 font-normal ml-1">({source.content.length.toLocaleString()} Zeichen)</span>
+                                                    {source.sourceInfo && (
+                                                        <span className="text-gray-500 font-normal ml-2">
+                                                            {[source.sourceInfo.authors, source.sourceInfo.institution, source.sourceInfo.year].filter(Boolean).join(', ')}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <p className="text-sm text-gray-700 mb-2">{source.summary}</p>
-                                                {source.keyFindings && (
-                                                    <ul className="text-xs text-gray-600 space-y-1">
-                                                        {source.keyFindings.map((f, i) => (
-                                                            <li key={i} className="flex items-start gap-1">
-                                                                <span className="text-green-500 mt-0.5">-</span>
-                                                                <span>{f}</span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
+                                                <p className="text-sm text-gray-700">{source.summary}</p>
+
+                                                {/* Statistics */}
+                                                {source.statistics && source.statistics.length > 0 && (
+                                                    <div>
+                                                        <div className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                                            Statistiken & Daten ({source.statistics.length})
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            {source.statistics.map((stat, i) => (
+                                                                <div key={i} className="flex items-start gap-2 text-xs bg-blue-50 rounded px-2 py-1.5 border border-blue-100">
+                                                                    <span className="font-bold text-blue-800 shrink-0">{stat.value}</span>
+                                                                    <span className="text-gray-700">{stat.metric}</span>
+                                                                    {stat.context && <span className="text-gray-400 shrink-0">({stat.context})</span>}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Quotable Data */}
+                                                {source.quotableData && source.quotableData.length > 0 && (
+                                                    <div>
+                                                        <div className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                            Zitierbare Evidenz ({source.quotableData.length})
+                                                        </div>
+                                                        <ul className="text-xs text-gray-700 space-y-1">
+                                                            {source.quotableData.map((q, i) => (
+                                                                <li key={i} className="bg-amber-50 rounded px-2 py-1.5 border border-amber-100 italic">
+                                                                    &ldquo;{q}&rdquo;
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+
+                                                {/* Key Findings */}
+                                                {source.keyFindings && source.keyFindings.length > 0 && (
+                                                    <div>
+                                                        <div className="text-xs font-bold text-green-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                                            Kernerkenntnisse ({source.keyFindings.length})
+                                                        </div>
+                                                        <ul className="text-xs text-gray-600 space-y-1">
+                                                            {source.keyFindings.map((f, i) => (
+                                                                <li key={i} className="flex items-start gap-1">
+                                                                    <span className="text-green-500 mt-0.5 shrink-0">-</span>
+                                                                    <span>{f}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
@@ -333,7 +385,7 @@ export function StarsStep2Sources({
                     <div className="flex items-center gap-2 text-sm text-indigo-800">
                         <CheckCircle2 className="h-4 w-4 text-indigo-500" />
                         <span className="font-medium">
-                            {analyzedCount} Quellen analysiert, {totalFindings} Erkenntnisse extrahiert
+                            {analyzedCount} Quellen analysiert — {totalStats} Statistiken, {totalFindings} Erkenntnisse
                         </span>
                     </div>
                 </div>
