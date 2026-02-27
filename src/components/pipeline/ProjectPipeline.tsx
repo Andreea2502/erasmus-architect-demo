@@ -803,6 +803,22 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
 
   // Full auto-run: Execute ALL steps automatically (1 through final step)
   // Includes sub-steps for partners (Step 2) and WPs (Step 6 / KA210 Step 4)
+  // Countdown helper: waits N seconds, updating status every second
+  const waitWithCountdown = async (
+    totalSeconds: number,
+    messagePrefix: string,
+    checkCancel: () => boolean
+  ) => {
+    for (let remaining = totalSeconds; remaining > 0; remaining--) {
+      if (checkCancel()) return;
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
+      setCurrentStatus(`${messagePrefix} (${timeStr})`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  };
+
   const handleExecuteAll = async () => {
     if (!pipelineState) return;
 
@@ -826,14 +842,25 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
       return;
     }
 
+    // ── RATE LIMIT AWARE DELAYS ───────────────────────────────────────
+    // WPs are the heaviest API calls → longest cooldown
+    const DELAY_BETWEEN_WPS = 150;       // 2.5 minutes between WP generations
+    const DELAY_BETWEEN_PARTNERS = 60;   // 1 minute between partner descriptions
+    const DELAY_BETWEEN_STEPS = 90;      // 1.5 minutes between main steps
+    const DELAY_RETRY = 180;             // 3 minutes before retry after error
+    const DELAY_RATE_LIMIT = 300;        // 5 minutes if rate limit detected (429)
+    // ──────────────────────────────────────────────────────────────────
+
     // Initialize auto-run state
     autoRunCancelledRef.current = false;
     autoRunStartTimeRef.current = Date.now();
     setIsAutoRunning(true);
 
+    const isCancelled = () => autoRunCancelledRef.current;
+
     for (let step = startStep; step <= endStep; step++) {
       // Check cancellation
-      if (autoRunCancelledRef.current) {
+      if (isCancelled()) {
         setCurrentStatus(language === 'de'
           ? `⏹ Auto-Generierung bei Schritt ${step} gestoppt. Fortschritt gespeichert.`
           : `⏹ Auto-generation stopped at step ${step}. Progress saved.`);
@@ -847,7 +874,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
       let retryCount = 0;
       let stepSuccess = false;
 
-      while (!stepSuccess && retryCount <= 1) {
+      while (!stepSuccess && retryCount <= 2) {
         try {
           // Small delay before starting to ensure UI is ready
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -863,7 +890,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
               : `Generating step 2: Organisations (${partnerCount} partners)...`);
 
             for (let partnerIdx = 0; partnerIdx < partnerCount; partnerIdx++) {
-              if (autoRunCancelledRef.current) break;
+              if (isCancelled()) break;
 
               const partner = currentLocalState.consortium[partnerIdx];
               setCurrentStatus(language === 'de'
@@ -871,7 +898,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
                 : `Step 2: Partner ${partnerIdx + 1}/${partnerCount} — ${partner.name}...`);
 
               const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error('Partner timeout')), 180000);
+                setTimeout(() => reject(new Error('Partner timeout')), 300000); // 5 min per partner
               });
 
               const { newState } = await Promise.race([
@@ -882,8 +909,17 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
               currentLocalState = newState;
               setPipelineState(newState);
 
+              // Save after each partner
+              saveGeneratorStateToProject(newState);
+
               if (partnerIdx < partnerCount - 1) {
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                await waitWithCountdown(
+                  DELAY_BETWEEN_PARTNERS,
+                  language === 'de'
+                    ? `⏳ Warte vor Partner ${partnerIdx + 2}/${partnerCount} (API-Cooldown)`
+                    : `⏳ Waiting before partner ${partnerIdx + 2}/${partnerCount} (API cooldown)`,
+                  isCancelled
+                );
               }
             }
           } else if (isWPStep) {
@@ -894,11 +930,11 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
               : `Generating step ${step}: Work Packages (${wpTotal} WPs)...`);
 
             for (let wpIdx = 0; wpIdx < wpTotal; wpIdx++) {
-              if (autoRunCancelledRef.current) break;
+              if (isCancelled()) break;
 
               setCurrentStatus(language === 'de'
-                ? `Schritt ${step}: WP ${wpIdx + 1} von ${wpTotal}...`
-                : `Step ${step}: WP ${wpIdx + 1} of ${wpTotal}...`);
+                ? `Schritt ${step}: WP ${wpIdx + 1} von ${wpTotal} wird generiert...`
+                : `Step ${step}: Generating WP ${wpIdx + 1} of ${wpTotal}...`);
 
               const timeoutPromise = new Promise<never>((_, reject) => {
                 setTimeout(() => reject(new Error('WP timeout')), 1200000); // 20 min per WP
@@ -915,8 +951,15 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
               // Auto-save after each WP
               saveGeneratorStateToProject(newState);
 
+              // Long cooldown between WPs to avoid rate limits
               if (wpIdx < wpTotal - 1) {
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                await waitWithCountdown(
+                  DELAY_BETWEEN_WPS,
+                  language === 'de'
+                    ? `⏳ WP ${wpIdx + 1}/${wpTotal} fertig. Warte vor WP ${wpIdx + 2} (API-Cooldown)`
+                    : `⏳ WP ${wpIdx + 1}/${wpTotal} done. Waiting before WP ${wpIdx + 2} (API cooldown)`,
+                  isCancelled
+                );
               }
             }
           } else {
@@ -945,27 +988,40 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
           // Update UI state
           setIsGenerating(false);
           setCurrentStatus(language === 'de'
-            ? `✅ Schritt ${step}/${endStep} fertig. ${step < endStep ? 'Weiter...' : ''}`
-            : `✅ Step ${step}/${endStep} done. ${step < endStep ? 'Continuing...' : ''}`);
+            ? `✅ Schritt ${step}/${endStep} fertig.`
+            : `✅ Step ${step}/${endStep} done.`);
 
-          // Robust delay between steps
+          // Cooldown between main steps
           if (step < endStep) {
-            await new Promise(resolve => setTimeout(resolve, 10000));
+            await waitWithCountdown(
+              DELAY_BETWEEN_STEPS,
+              language === 'de'
+                ? `⏳ Schritt ${step}/${endStep} fertig. Warte vor naechstem Schritt (API-Cooldown)`
+                : `⏳ Step ${step}/${endStep} done. Waiting before next step (API cooldown)`,
+              isCancelled
+            );
           }
         } catch (error) {
           console.warn(`Pipeline error at step ${step} (retry ${retryCount})`, error);
           const errorMsg = (error as Error).message;
+          const isRateLimit = errorMsg.includes('429') || errorMsg.includes('rate') || errorMsg.includes('Rate') || errorMsg.includes('quota') || errorMsg.includes('too many');
 
-          if (retryCount < 1) {
+          if (retryCount < 2) {
             retryCount++;
-            setCurrentStatus(language === 'de'
-              ? `⚠️ Fehler bei Schritt ${step}. Wiederholungsversuch in 15 Sekunden...`
-              : `⚠️ Error at step ${step}. Retrying in 15 seconds...`);
-            await new Promise(resolve => setTimeout(resolve, 15000));
+            const waitTime = isRateLimit ? DELAY_RATE_LIMIT : DELAY_RETRY;
+            const waitMins = Math.round(waitTime / 60);
+
+            await waitWithCountdown(
+              waitTime,
+              language === 'de'
+                ? `⚠️ ${isRateLimit ? 'API-Rate-Limit erreicht' : 'Fehler'} bei Schritt ${step}. Versuch ${retryCount + 1}/3 — Warte ${waitMins} Min.`
+                : `⚠️ ${isRateLimit ? 'API rate limit hit' : 'Error'} at step ${step}. Attempt ${retryCount + 1}/3 — waiting ${waitMins} min`,
+              isCancelled
+            );
             continue; // Retry the step
           }
 
-          // After retry failed: save progress and stop
+          // After all retries failed: save progress and stop
           saveGeneratorStateToProject(currentLocalState);
 
           if (errorMsg.includes('timeout')) {

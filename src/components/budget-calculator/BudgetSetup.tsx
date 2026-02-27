@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Plus, Trash2, Users, Layers, Sparkles, ArrowRight, Import } from 'lucide-react';
+import { Plus, Trash2, Users, Layers, Sparkles, ArrowRight, Import, FileUp, Percent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,10 +10,17 @@ import { Badge } from '@/components/ui/badge';
 import { useBudgetCalculatorStore } from '@/store/budget-calculator-store';
 import { useAppStore } from '@/store/app-store';
 import { BUDGET_TIERS } from '@/store/types';
+import { getCountryProfile, COST_GROUP_META } from '@/lib/country-cost-profiles';
 
-export function BudgetSetup() {
+interface BudgetSetupProps {
+    onImportClick?: () => void;
+    onStartWithDistribution?: () => void;
+}
+
+export function BudgetSetup({ onImportClick, onStartWithDistribution }: BudgetSetupProps) {
     const store = useBudgetCalculatorStore();
     const appPartners = useAppStore(s => s.partners);
+    const projects = useAppStore(s => s.projects);
 
     const [newPartnerName, setNewPartnerName] = useState('');
     const [newPartnerCountry, setNewPartnerCountry] = useState('');
@@ -23,10 +30,11 @@ export function BudgetSetup() {
 
     const tiers = BUDGET_TIERS[store.actionType] || [250000];
     const canStart = store.partners.length >= 2 && store.workPackages.length >= 1;
+    const hasImportableProjects = projects.some(p => p.generatorState?.consortium?.length > 0 || p.generatorState?.workPackages?.length > 0);
 
     const handleAddPartner = () => {
         if (!newPartnerName.trim() || !newPartnerCountry.trim()) return;
-        store.addPartner(newPartnerName.trim(), newPartnerCountry.trim());
+        store.addPartner(newPartnerName.trim(), newPartnerCountry.trim().toUpperCase());
         setNewPartnerName('');
         setNewPartnerCountry('');
     };
@@ -54,6 +62,47 @@ export function BudgetSetup() {
 
     return (
         <div className="space-y-6">
+
+            {/* ============================================================ */}
+            {/* IMPORT FROM PROJECT — prominent CTA                          */}
+            {/* ============================================================ */}
+            {hasImportableProjects && onImportClick && (
+                <Card className="border-2 border-dashed border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50">
+                    <CardContent className="py-6">
+                        <button
+                            onClick={onImportClick}
+                            className="w-full flex items-center gap-4 text-left group"
+                        >
+                            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <FileUp className="h-6 w-6" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
+                                    Fertigen Antrag importieren
+                                </p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                    Lade WPs, Partner und Aktivitaeten aus einem generierten Antrag.
+                                    Budgets werden automatisch nach Laendergruppen verteilt.
+                                </p>
+                            </div>
+                            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                        </button>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Divider */}
+            {hasImportableProjects && onImportClick && (
+                <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-200"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                        <span className="bg-gray-50 px-3 text-gray-400 font-medium">oder manuell konfigurieren</span>
+                    </div>
+                </div>
+            )}
+
             {/* ============================================================ */}
             {/* ACTION TYPE & BUDGET TIER                                     */}
             {/* ============================================================ */}
@@ -162,33 +211,38 @@ export function BudgetSetup() {
                         </div>
                     )}
 
-                    {/* Partner List */}
+                    {/* Partner List — now with country group indicators */}
                     {store.partners.length > 0 && (
                         <div className="space-y-2">
-                            {store.partners.map((p, i) => (
-                                <div key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                                    <span className="text-sm font-medium text-gray-900 flex-1">{p.name}</span>
-                                    <span className="text-xs text-gray-500">{p.country}</span>
-                                    <Badge
-                                        variant={p.role === 'coordinator' ? 'default' : 'secondary'}
-                                        className={`text-xs cursor-pointer ${p.role === 'coordinator' ? 'bg-blue-600' : ''}`}
-                                        onClick={() => {
-                                            // Toggle role: set this one as coordinator, others as partner
-                                            store.partners.forEach(pp => {
-                                                store.updatePartner(pp.id, { role: pp.id === p.id ? 'coordinator' : 'partner' });
-                                            });
-                                        }}
-                                    >
-                                        {p.role === 'coordinator' ? 'Koordinator' : 'Partner'}
-                                    </Badge>
-                                    <button
-                                        onClick={() => store.removePartner(p.id)}
-                                        className="text-gray-400 hover:text-red-500"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
-                                </div>
-                            ))}
+                            {store.partners.map((p) => {
+                                const profile = getCountryProfile(p.country);
+                                const groupMeta = COST_GROUP_META[profile.group];
+                                return (
+                                    <div key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                                        <span className="text-sm font-medium text-gray-900 flex-1">{p.name}</span>
+                                        <Badge className={`${groupMeta.bgColor} ${groupMeta.color} text-[10px] px-1.5`}>
+                                            {p.country} · x{profile.staffMultiplier}
+                                        </Badge>
+                                        <Badge
+                                            variant={p.role === 'coordinator' ? 'default' : 'secondary'}
+                                            className={`text-xs cursor-pointer ${p.role === 'coordinator' ? 'bg-blue-600' : ''}`}
+                                            onClick={() => {
+                                                store.partners.forEach(pp => {
+                                                    store.updatePartner(pp.id, { role: pp.id === p.id ? 'coordinator' : 'partner' });
+                                                });
+                                            }}
+                                        >
+                                            {p.role === 'coordinator' ? 'Koordinator' : 'Partner'}
+                                        </Badge>
+                                        <button
+                                            onClick={() => store.removePartner(p.id)}
+                                            className="text-gray-400 hover:text-red-500"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
 
@@ -287,28 +341,43 @@ export function BudgetSetup() {
             </Card>
 
             {/* ============================================================ */}
-            {/* START BUTTON                                                  */}
+            {/* START BUTTONS                                                 */}
             {/* ============================================================ */}
             <div className="flex items-center gap-4">
-                <Button
-                    onClick={() => store.setSetupComplete(true)}
-                    disabled={!canStart}
-                    className="flex-1 h-14 text-lg bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                    <ArrowRight className="h-5 w-5 mr-2" />
-                    Budget-Planung starten
-                </Button>
-                {store.workPackages.some(wp => wp.targetPercent) && (
+                {/* Smart start: go through distribution first */}
+                {onStartWithDistribution && (
                     <Button
-                        onClick={() => { store.autoDistribute(); store.setSetupComplete(true); }}
+                        onClick={onStartWithDistribution}
                         disabled={!canStart}
-                        variant="outline"
-                        className="h-14 text-blue-600 border-blue-200"
+                        className="flex-1 h-14 text-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
                     >
-                        <Sparkles className="h-5 w-5 mr-2" />
-                        Auto-Verteilen & Starten
+                        <Percent className="h-5 w-5 mr-2" />
+                        Weiter zur Budget-Verteilung
                     </Button>
                 )}
+
+                {/* Legacy: direct start (skip distribution, equal split) */}
+                <Button
+                    onClick={() => { store.autoDistribute(); store.setSetupComplete(true); }}
+                    disabled={!canStart}
+                    variant={onStartWithDistribution ? 'outline' : 'default'}
+                    className={onStartWithDistribution
+                        ? 'h-14 text-gray-600 border-gray-300'
+                        : 'flex-1 h-14 text-lg bg-blue-600 hover:bg-blue-700 text-white'
+                    }
+                >
+                    {onStartWithDistribution ? (
+                        <>
+                            <ArrowRight className="h-4 w-4 mr-1" />
+                            Gleich-Verteilung & Starten
+                        </>
+                    ) : (
+                        <>
+                            <Sparkles className="h-5 w-5 mr-2" />
+                            Auto-Verteilen & Starten
+                        </>
+                    )}
+                </Button>
             </div>
         </div>
     );

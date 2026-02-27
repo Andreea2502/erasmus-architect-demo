@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { BUDGET_TIERS } from '@/store/types';
-import { BENCHMARKS } from '@/lib/wp-templates';
+import {
+    getCountryProfile,
+    suggestPartnerPercentages,
+    distributeWPBudget,
+    type PartnerBudgetShare,
+} from '@/lib/country-cost-profiles';
 
 // ============================================================================
 // TYPES
@@ -187,6 +192,10 @@ interface BudgetCalculatorState {
     workPackages: BudgetWorkPackage[];
     cells: Record<CellKey, number>;
     isSetupComplete: boolean;
+    /** Partner budget percentages: partnerId → percentage (sum should be 100) */
+    partnerPercentages: Record<string, number>;
+    /** Project ID this was imported from (if any) */
+    importedFromProjectId?: string;
 }
 
 interface BudgetCalculatorActions {
@@ -205,6 +214,57 @@ interface BudgetCalculatorActions {
     setSetupComplete: (complete: boolean) => void;
     clearAllCells: () => void;
     resetAll: () => void;
+    /** Set budget percentage for one partner */
+    setPartnerPercentage: (partnerId: string, percent: number) => void;
+    /** Auto-suggest percentages based on coordinator role + country cost profiles */
+    suggestPercentages: () => void;
+    /** Smart distribute: uses partner percentages + country cost multipliers */
+    smartDistribute: () => void;
+    /** Import from a finished project's generatorState */
+    importFromProject: (generatorState: ImportableGeneratorState) => void;
+}
+
+/**
+ * Minimal subset of PipelineState needed for import.
+ * We don't import the full PipelineState type to avoid circular deps.
+ */
+export interface ImportableGeneratorState {
+    projectTitle?: string;
+    acronym?: string;
+    consortium?: Array<{
+        id: string;
+        name: string;
+        country: string;
+        isLead?: boolean;
+        role?: string;
+    }>;
+    idea?: {
+        actionType?: 'KA220' | 'KA210';
+    };
+    configuration?: {
+        totalBudget?: number;
+        wpCount?: number;
+        actionType?: 'KA220' | 'KA210';
+    };
+    workPackages?: Array<{
+        number: number;
+        title: string;
+        lead?: string;
+        activities?: Array<{ title: string }>;
+        deliverables?: Array<{ title: string }>;
+        budget?: number | string;
+    }>;
+    budget?: {
+        totalBudget?: number;
+        perPartner?: Array<{ partner: string; amount: number; percentage: number }>;
+        perWorkPackage?: Array<{ wp: number; amount: number }>;
+    };
+    wpConfigurations?: Array<{
+        wpNumber: number;
+        title: string;
+        titleDE?: string;
+        budgetPercent?: number;
+    }>;
 }
 
 export type BudgetCalculatorStore = BudgetCalculatorState & BudgetCalculatorActions;
@@ -216,6 +276,8 @@ const initialState: BudgetCalculatorState = {
     workPackages: [],
     cells: {},
     isSetupComplete: false,
+    partnerPercentages: {},
+    importedFromProjectId: undefined,
 };
 
 function uid(): string {
@@ -376,6 +438,151 @@ export const useBudgetCalculatorStore = create<BudgetCalculatorStore>()(
             clearAllCells: () => set({ cells: {} }),
 
             resetAll: () => set(initialState),
+
+            setPartnerPercentage: (partnerId, percent) => {
+                set((state) => ({
+                    partnerPercentages: { ...state.partnerPercentages, [partnerId]: Math.max(0, Math.min(100, percent)) },
+                }));
+            },
+
+            suggestPercentages: () => {
+                const state = get();
+                if (state.partners.length === 0) return;
+                const suggestions = suggestPartnerPercentages(
+                    state.partners.map(p => ({
+                        id: p.id,
+                        country: p.country,
+                        isCoordinator: p.role === 'coordinator',
+                    }))
+                );
+                set({ partnerPercentages: suggestions });
+            },
+
+            smartDistribute: () => {
+                const state = get();
+                const { budgetTier, workPackages, partners, partnerPercentages } = state;
+                if (partners.length === 0 || workPackages.length === 0) return;
+
+                // Ensure we have percentages (fall back to equal)
+                const pcts: Record<string, number> = {};
+                const hasPercentages = Object.keys(partnerPercentages).length > 0;
+                if (hasPercentages) {
+                    Object.assign(pcts, partnerPercentages);
+                } else {
+                    const equal = Math.round(100 / partners.length);
+                    partners.forEach((p, i) => {
+                        pcts[p.id] = i === partners.length - 1 ? 100 - equal * (partners.length - 1) : equal;
+                    });
+                }
+
+                const newCells: Record<CellKey, number> = {};
+                const totalTarget = workPackages.reduce((s, wp) => s + (wp.targetPercent || 0), 0);
+
+                for (const wp of workPackages) {
+                    const wpPercent = wp.targetPercent || (totalTarget > 0 ? 0 : (100 / workPackages.length));
+                    if (wpPercent === 0) continue;
+
+                    const wpBudget = Math.round(budgetTier * wpPercent / 100);
+
+                    // Build partner shares for this WP
+                    const shares: PartnerBudgetShare[] = partners.map(p => ({
+                        partnerId: p.id,
+                        name: p.name,
+                        country: p.country,
+                        isCoordinator: p.role === 'coordinator',
+                        budgetPercent: pcts[p.id] || 0,
+                    }));
+
+                    const distributed = distributeWPBudget(wpBudget, wp.title, shares);
+
+                    // Write to cells
+                    for (const partner of partners) {
+                        const d = distributed[partner.id];
+                        if (!d) continue;
+                        if (d.staff > 0) newCells[makeCellKey(wp.id, partner.id, 'staff')] = d.staff;
+                        if (d.travel > 0) newCells[makeCellKey(wp.id, partner.id, 'travel')] = d.travel;
+                        if (d.equipment > 0) newCells[makeCellKey(wp.id, partner.id, 'equipment')] = d.equipment;
+                        if (d.subcontracting > 0) newCells[makeCellKey(wp.id, partner.id, 'subcontracting')] = d.subcontracting;
+                        if (d.other > 0) newCells[makeCellKey(wp.id, partner.id, 'other')] = d.other;
+                    }
+                }
+
+                set({ cells: newCells });
+            },
+
+            importFromProject: (gs: ImportableGeneratorState) => {
+                const actionType = gs.configuration?.actionType || gs.idea?.actionType || 'KA220';
+                const budgetTier = gs.configuration?.totalBudget || gs.budget?.totalBudget || BUDGET_TIERS[actionType][BUDGET_TIERS[actionType].length - 1];
+
+                // Import partners
+                const partners: BudgetPartner[] = (gs.consortium || []).map((p, i) => ({
+                    id: `bp_${uid()}_${i}`,
+                    name: p.name,
+                    country: p.country,
+                    role: (p.isLead || p.role === 'Coordinator' || i === 0) ? 'coordinator' as const : 'partner' as const,
+                    appStorePartnerId: p.id,
+                }));
+
+                // Import work packages
+                const workPackages: BudgetWorkPackage[] = (gs.workPackages || []).map((wp, i) => {
+                    // Try to get budget percent from wpConfigurations or generated budget
+                    let targetPercent: number | undefined;
+                    const wpConfig = gs.wpConfigurations?.find(c => c.wpNumber === wp.number);
+                    if (wpConfig?.budgetPercent) {
+                        targetPercent = wpConfig.budgetPercent;
+                    } else if (gs.budget?.perWorkPackage) {
+                        const wpBudget = gs.budget.perWorkPackage.find(b => b.wp === wp.number);
+                        if (wpBudget && budgetTier > 0) {
+                            targetPercent = Math.round((wpBudget.amount / budgetTier) * 100);
+                        }
+                    }
+
+                    return {
+                        id: `wp_${uid()}_${i}`,
+                        number: wp.number,
+                        title: wp.title,
+                        titleDE: wpConfig?.titleDE || wp.title,
+                        targetPercent,
+                    };
+                });
+
+                // Build initial partner percentages
+                const pcts: Record<string, number> = {};
+                if (gs.budget?.perPartner && partners.length > 0) {
+                    // Try to match by partner name
+                    for (const bp of partners) {
+                        const match = gs.budget.perPartner.find(
+                            pp => pp.partner.toLowerCase().includes(bp.name.toLowerCase().slice(0, 8))
+                                || bp.name.toLowerCase().includes(pp.partner.toLowerCase().slice(0, 8))
+                        );
+                        if (match) {
+                            pcts[bp.id] = match.percentage;
+                        }
+                    }
+                }
+
+                // If we didn't match percentages, suggest them
+                if (Object.keys(pcts).length === 0 && partners.length > 0) {
+                    const suggestions = suggestPartnerPercentages(
+                        partners.map(p => ({
+                            id: p.id,
+                            country: p.country,
+                            isCoordinator: p.role === 'coordinator',
+                        }))
+                    );
+                    Object.assign(pcts, suggestions);
+                }
+
+                set({
+                    actionType: actionType as 'KA210' | 'KA220',
+                    budgetTier,
+                    partners,
+                    workPackages,
+                    cells: {},
+                    isSetupComplete: false,
+                    partnerPercentages: pcts,
+                });
+            },
         }),
         {
             name: 'erasmus-budget-calculator-v1',
