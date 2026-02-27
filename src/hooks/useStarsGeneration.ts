@@ -12,6 +12,8 @@ import {
     getStarsTargetGroupsPrompt,
     getStarsMethodologyPrompt,
     getAssembleStarsExposePrompt,
+    getReviseExposePrompt,
+    getExtractRevisedDataPrompt,
     buildPartnershipFactsBlock,
     buildSelectedConceptBlock,
     buildKpiReferenceBlock,
@@ -806,6 +808,102 @@ REGELN:
     };
 
     // ========================================================================
+    // Step 5b: Revise Expose based on evaluator feedback
+    // ========================================================================
+
+    const reviseExpose = async () => {
+        if (!store.fullExpose || !store.evaluatorFeedback?.trim()) return;
+
+        store.updateState({ isRevisingExpose: true, revisionError: undefined });
+
+        try {
+            const partnershipFacts = getPartnershipFacts();
+            const kpiReference = buildKpiReferenceBlock(store.goals, store.starsTargetGroups);
+
+            // Step 1: Revise the full Expose markdown based on feedback
+            const revisePrompt = getReviseExposePrompt(
+                store.fullExpose,
+                store.evaluatorFeedback,
+                partnershipFacts,
+                kpiReference
+            );
+
+            const revisedResponse = await generateContentAction(
+                revisePrompt,
+                'Du bist ein erfahrener Erasmus+ Proposal Editor. Überarbeite das Expose präzise auf Basis des Feedbacks.',
+                0.3, // Low temperature for precision
+                90000
+            );
+
+            let revisedMarkdown = revisedResponse;
+            if (revisedMarkdown.startsWith('```markdown')) {
+                revisedMarkdown = revisedMarkdown.replace(/^```markdown\n/, '').replace(/\n```$/, '');
+            }
+
+            // Step 2: Extract updated structured data from the revised Expose
+            // This keeps the store in sync so the Generator stays consistent
+            try {
+                const extractPrompt = getExtractRevisedDataPrompt(revisedMarkdown);
+                const extractResponse = await generateContentAction(
+                    extractPrompt,
+                    JSON_SYSTEM,
+                    0.2,
+                    45000
+                );
+
+                const cleanExtract = cleanJsonResponse(extractResponse);
+                const parsedData = JSON.parse(cleanExtract);
+
+                // Update goals if extracted successfully
+                if (parsedData.goals && Array.isArray(parsedData.goals)) {
+                    const updatedGoals: StarsGoal[] = parsedData.goals.map((g: any, i: number) => ({
+                        id: store.goals[i]?.id || `goal_revised_${Date.now()}_${i}`,
+                        number: g.number || i + 1,
+                        statement: g.statement || '',
+                        rationale: g.rationale || '',
+                        measurableOutcome: g.measurableOutcome || '',
+                    }));
+
+                    store.updateState({ goals: updatedGoals });
+                }
+
+                // Update target groups if extracted successfully
+                if (parsedData.targetGroups && Array.isArray(parsedData.targetGroups)) {
+                    const updatedTGs: StarsTargetGroup[] = parsedData.targetGroups.map((tg: any, i: number) => ({
+                        id: store.starsTargetGroups[i]?.id || `tg_revised_${Date.now()}_${i}`,
+                        level: tg.level || 'PRIMARY',
+                        name: tg.name || '',
+                        description: tg.description || '',
+                        characteristicsAndNeeds: tg.characteristicsAndNeeds || '',
+                        roleInProject: tg.roleInProject || '',
+                        estimatedReach: tg.estimatedReach || '',
+                    }));
+
+                    store.updateState({ starsTargetGroups: updatedTGs });
+                }
+            } catch (syncError) {
+                // Store sync failed, but the revised expose is still usable
+                console.warn('Could not sync store data from revised expose:', syncError);
+            }
+
+            // Update the expose and increment revision counter
+            store.updateState({
+                fullExpose: revisedMarkdown.trim(),
+                isRevisingExpose: false,
+                revisionCount: (store.revisionCount || 0) + 1,
+                // Clear the feedback after successful revision
+                evaluatorFeedback: '',
+            });
+        } catch (e: any) {
+            console.error('Expose revision error:', e);
+            store.updateState({
+                isRevisingExpose: false,
+                revisionError: e?.message || 'Überarbeitung fehlgeschlagen. Bitte erneut versuchen.',
+            });
+        }
+    };
+
+    // ========================================================================
     // Step 5: Translate Expose (German -> English)
     // ========================================================================
 
@@ -858,6 +956,7 @@ ${store.fullExpose}`;
         generateTargetGroups,
         generateMethodology,
         generateFullExpose,
+        reviseExpose,
         translateExpose,
     };
 }

@@ -78,6 +78,12 @@ export const initialStarsState: StarsConceptStoreState = {
     isTranslatingExpose: false,
     exposeError: undefined,
     additionalInstructions: '',
+
+    // Step 5b: Revision Mode
+    evaluatorFeedback: '',
+    isRevisingExpose: false,
+    revisionError: undefined,
+    revisionCount: 0,
 };
 
 export const useStarsConceptStore = create<StarsConceptStore>()(
@@ -109,6 +115,7 @@ export const useStarsConceptStore = create<StarsConceptStore>()(
                 isGeneratingMethodology: false,
                 isGeneratingExpose: false,
                 isTranslatingExpose: false,
+                isRevisingExpose: false,
                 // Clear errors on save
                 conceptError: undefined,
                 partnershipNarrativeError: undefined,
@@ -119,6 +126,7 @@ export const useStarsConceptStore = create<StarsConceptStore>()(
                 targetGroupsError: undefined,
                 methodologyError: undefined,
                 exposeError: undefined,
+                revisionError: undefined,
             }),
         }
     )

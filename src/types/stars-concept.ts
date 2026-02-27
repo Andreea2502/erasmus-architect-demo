@@ -150,6 +150,12 @@ export interface StarsConceptState {
     isTranslatingExpose: boolean;
     exposeError?: string;
     additionalInstructions?: string;
+
+    // Step 5b: Revision Mode (post-evaluation)
+    evaluatorFeedback: string;          // Pasted evaluator feedback
+    isRevisingExpose: boolean;          // Loading state for revision
+    revisionError?: string;             // Error from revision attempt
+    revisionCount: number;              // How many revisions have been applied
 }
 
 // ============================================================================

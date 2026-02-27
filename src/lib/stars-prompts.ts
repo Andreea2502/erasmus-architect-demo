@@ -1116,3 +1116,126 @@ ${ANTI_BUZZWORD_RULES}
 
 OUTPUT FORMAT: A complete Markdown document. No wrapping in code blocks. No preamble like "Here is your document." Start directly with the title heading.`;
 }
+
+// ============================================================================
+// 9. REVISE STARS EXPOSE PROMPT (post-evaluation revision)
+// ============================================================================
+
+/**
+ * Revises an existing STARS Expose based on evaluator feedback.
+ * The AI analyzes the feedback, identifies corrections, and applies them
+ * throughout the entire document while maintaining consistency.
+ * Output: revised Markdown document.
+ */
+export function getReviseExposePrompt(
+  currentExpose: string,
+  evaluatorFeedback: string,
+  partnershipFacts?: string,
+  kpiReference?: string
+): string {
+  return `Du bist ein erfahrener Erasmus+ Proposal Editor, der ein bestehendes STARS Expose auf Basis von Evaluator-Feedback überarbeitet.
+
+${partnershipFacts || ''}
+
+AKTUELLES EXPOSE (Markdown):
+${currentExpose}
+
+EVALUATOR-FEEDBACK:
+${evaluatorFeedback}
+
+${kpiReference ? `BISHERIGES KPI-REFERENZBLATT (wird durch die Revision ÜBERSCHRIEBEN):\n${kpiReference}\n` : ''}
+
+AUFGABE: Überarbeite das gesamte Expose auf Basis des Evaluator-Feedbacks. Du musst:
+
+1. FEEDBACK ANALYSIEREN:
+   - Identifiziere JEDE konkrete Korrektur im Feedback (Zahlenänderungen, fehlende KPIs, unrealistische Schätzungen, inhaltliche Anmerkungen).
+   - Liste intern für dich die Änderungen auf, BEVOR du mit der Überarbeitung beginnst.
+
+2. ÄNDERUNGEN DURCHZIEHEN — ÜBERALL:
+   - KRITISCH: Wenn eine Zahl geändert wird (z.B. "20 Teilnehmer" → "60 Teilnehmer"), muss diese Änderung in JEDER Sektion angepasst werden, in der die Zahl vorkommt:
+     • Section 3.3 (Project Response) — Action Pillars
+     • Section 4 (Goals) — Measurable Outcomes / KPIs
+     • Section 5 (Target Groups) — Estimated Reach
+     • Section 6 (Methodology) — ggf. Participant-Zahlen
+   - Wenn ein neuer KPI hinzugefügt werden soll, muss er in den Goals UND den Target Groups UND ggf. in der Response erscheinen.
+   - ZAHLEN-KONSISTENZ ist die oberste Priorität. Jede Zahl, die du änderst, muss überall im Dokument aktualisiert werden.
+
+3. NARRATIVE ANPASSEN:
+   - Wenn das Feedback inhaltliche Änderungen vorschlägt (z.B. "stärkerer Fokus auf X"), passe die betroffenen Narrativ-Abschnitte an.
+   - Halte dabei den professionellen, akademischen Schreibstil bei.
+   - Verändere NICHT die Grundstruktur oder die Sektionsreihenfolge des Dokuments.
+
+4. ALLES ANDERE BEIBEHALTEN:
+   - Sektionen, die NICHT vom Feedback betroffen sind, müssen UNVERÄNDERT bleiben.
+   - Die Markdown-Formatierung (### Überschriften, #### Unter-Überschriften, Tabellen, Bullet Points) muss beibehalten werden.
+   - Der Stil, Ton und die Qualität des bestehenden Textes muss erhalten bleiben.
+
+ABSOLUTE REGELN:
+- Ändere NUR das, was das Feedback explizit verlangt. Keine eigenmächtigen "Verbesserungen".
+- Jede Zahlenänderung muss in ALLEN Sektionen konsistent durchgezogen werden.
+- Wenn das Feedback widersprüchlich ist (z.B. "mehr Teilnehmer" aber "kleineres Budget"), folge der konservativeren Interpretation und weise im Text nicht darauf hin.
+- Das Ergebnis muss sofort als PDF exportierbar sein — keine Platzhalter, keine Kommentare, keine "TODO"-Marker.
+- PARTNERSHIP FACTS sind unveränderlich. Wenn das Feedback Länder oder Partner vorschlägt, die nicht im Konsortium sind, ignoriere das.
+
+${ANTI_BUZZWORD_RULES}
+
+OUTPUT FORMAT: Das vollständig überarbeitete Markdown-Dokument. Kein Code-Block-Wrapping. Keine Präambel. Direkt mit der Titel-Überschrift beginnen.`;
+}
+
+// ============================================================================
+// 10. EXTRACT REVISED KPIs FROM EXPOSE (sync store after revision)
+// ============================================================================
+
+/**
+ * Extracts updated structured data (goals + target groups) from a revised Expose.
+ * Used to sync the store after a revision so that the Generator stays consistent.
+ * Output: JSON with goals and targetGroups arrays.
+ */
+export function getExtractRevisedDataPrompt(
+  revisedExpose: string
+): string {
+  return `Analysiere das folgende STARS Expose und extrahiere die aktuellen Projektziele und Zielgruppen als strukturierte Daten.
+
+EXPOSE:
+${revisedExpose}
+
+AUFGABE: Extrahiere die Goals aus Section 4 und die Target Groups aus Section 5 im JSON-Format.
+
+Für JEDES Goal extrahiere:
+- "number": Die Goal-Nummer (1, 2, 3, ...)
+- "statement": Der Goal-Text (aus der Zeile "Goal")
+- "rationale": Der Rationale-Text (aus den Bullet Points, zusammengefügt mit "; ")
+- "measurableOutcome": Der KPI-Text (aus der Zeile "KPI")
+
+Für JEDE Target Group extrahiere:
+- "level": "PRIMARY", "SECONDARY", "TERTIARY" oder "QUATERNARY"
+- "name": Der Name der Zielgruppe (aus der #### Überschrift)
+- "description": Die Profile-Bullets zusammengefügt
+- "characteristicsAndNeeds": Die Needs-Bullets zusammengefügt
+- "roleInProject": Die Project Role-Bullets zusammengefügt
+- "estimatedReach": Der Reach-Wert
+
+OUTPUT FORMAT: NUR valides JSON:
+{
+  "goals": [
+    {
+      "number": 1,
+      "statement": "...",
+      "rationale": "...",
+      "measurableOutcome": "..."
+    }
+  ],
+  "targetGroups": [
+    {
+      "level": "PRIMARY",
+      "name": "...",
+      "description": "...",
+      "characteristicsAndNeeds": "...",
+      "roleInProject": "...",
+      "estimatedReach": "..."
+    }
+  ]
+}
+
+Kein zusätzlicher Text außerhalb des JSON.`;
+}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
     Star, FileDown, Globe, ArrowRight, RefreshCw, Rocket,
     BookOpen, Users, Target, Layers, ChevronDown, ChevronUp,
+    MessageSquareWarning, CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,10 +28,11 @@ interface StarsStep5SummaryProps {
 
 export function StarsStep5Summary({ exportToPipeline }: StarsStep5SummaryProps) {
     const store = useStarsConceptStore();
-    const { generateFullExpose, translateExpose } = useStarsGeneration();
+    const { generateFullExpose, reviseExpose, translateExpose } = useStarsGeneration();
 
     const [sectionsOpen, setSectionsOpen] = useState(false);
     const [showInstructionInput, setShowInstructionInput] = useState(false);
+    const [showRevisionPanel, setShowRevisionPanel] = useState(false);
 
     const sectorLabel = SECTORS.find(s => s.value === store.sector)?.label || store.sector;
     const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
@@ -545,6 +547,11 @@ export function StarsStep5Summary({ exportToPipeline }: StarsStep5SummaryProps) 
                                 <Globe className="h-4 w-4 animate-spin" /> Wird ubersetzt...
                             </div>
                         )}
+                        {store.isRevisingExpose && (
+                            <div className="bg-amber-50 p-2 text-sm text-amber-700 font-medium flex items-center justify-center gap-2 border-b">
+                                <MessageSquareWarning className="h-4 w-4 animate-pulse" /> Evaluator-Feedback wird eingearbeitet...
+                            </div>
+                        )}
 
                         {/* Rendered markdown content */}
                         <div className="p-6 max-h-[70vh] overflow-y-auto w-full prose prose-sm md:prose-base max-w-none text-gray-800 border-l-4 border-indigo-400">
@@ -621,6 +628,96 @@ export function StarsStep5Summary({ exportToPipeline }: StarsStep5SummaryProps) 
                             {store.fullExpose}
                         </ReactMarkdown>
                     </div>
+                </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* REVISION MODE (post-evaluation feedback)                     */}
+            {/* ============================================================ */}
+            {store.fullExpose && (
+                <div className="bg-white rounded-xl border overflow-hidden">
+                    {/* Revision Mode Toggle Header */}
+                    <button
+                        onClick={() => setShowRevisionPanel(!showRevisionPanel)}
+                        className="w-full flex items-center justify-between p-4 text-left hover:bg-amber-50/50 transition-colors"
+                    >
+                        <span className="font-semibold text-gray-900 flex items-center gap-2">
+                            <MessageSquareWarning className="h-5 w-5 text-amber-500" />
+                            Evaluator-Feedback einarbeiten
+                            {store.revisionCount > 0 && (
+                                <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    {store.revisionCount} {store.revisionCount === 1 ? 'Revision' : 'Revisionen'}
+                                </span>
+                            )}
+                        </span>
+                        {showRevisionPanel
+                            ? <ChevronUp className="h-4 w-4 text-gray-400" />
+                            : <ChevronDown className="h-4 w-4 text-gray-400" />
+                        }
+                    </button>
+
+                    {showRevisionPanel && (
+                        <div className="px-4 pb-4 space-y-4 border-t pt-4">
+                            {/* Explanation */}
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                <p className="text-sm text-amber-800">
+                                    <strong>So funktioniert es:</strong> Kopiere das Feedback deines Evaluators hierhin.
+                                    Die KI analysiert die Anmerkungen und arbeitet alle Korrekturen (Zahlen, KPIs, inhaltliche Anderungen)
+                                    automatisch in das gesamte Expose ein — konsistent uber alle Sektionen hinweg.
+                                </p>
+                            </div>
+
+                            {/* Feedback Input */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Evaluator-Feedback einfugen
+                                </label>
+                                <Textarea
+                                    placeholder={`z.B.:\n- Bedarfsanalyse: 20 Teilnehmer sind zu wenig → auf 60 erhohen\n- Training: 25 Lehrkrafte unklar → 75 (25 pro Land) als Haupt-KPI\n- Fehlender Endnutzer-Impact: 225 erwachsene Lernende als Ziel ergaenzen\n- Multiplikator-Events: 240 Stakeholder unrealistisch → auf 120-150 reduzieren`}
+                                    value={store.evaluatorFeedback}
+                                    onChange={(e) => store.updateState({ evaluatorFeedback: e.target.value })}
+                                    className="min-h-[160px] bg-white border-amber-200 focus:border-amber-400 focus:ring-amber-400 text-sm"
+                                />
+                                <p className="text-xs text-gray-400 mt-1">
+                                    Tipp: Je konkreter das Feedback (mit genauen Zahlen), desto praziser die Uberarbeitung.
+                                </p>
+                            </div>
+
+                            {/* Revision Error */}
+                            {store.revisionError && (
+                                <FeedbackMessage
+                                    type="error"
+                                    message={store.revisionError}
+                                    onRetry={reviseExpose}
+                                />
+                            )}
+
+                            {/* Revision Actions */}
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs text-gray-400">
+                                    Die strukturierten Daten (Ziele, Zielgruppen) werden automatisch mit-aktualisiert.
+                                </p>
+                                <Button
+                                    onClick={reviseExpose}
+                                    disabled={store.isRevisingExpose || !store.evaluatorFeedback?.trim()}
+                                    className="bg-amber-600 hover:bg-amber-700 text-white min-w-[200px]"
+                                >
+                                    {store.isRevisingExpose ? (
+                                        <>
+                                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                            Uberarbeite Expose...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <MessageSquareWarning className="h-4 w-4 mr-2" />
+                                            Expose uberarbeiten
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
