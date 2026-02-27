@@ -1034,51 +1034,65 @@ Insert the response text. The introductory paragraph should flow from the Opport
 
 ### Section 4: Project Goals
 
-Convert the goals JSON into a set of individual goal tables. For EACH goal, create a separate Markdown table using this EXACT format:
+Convert the goals JSON into individual goal cards. For EACH goal, use this EXACT format:
 
 #### Goal [number]
 
 | | |
 |:--|:--|
-| **Goal Statement** | [The full goal statement text] |
-| **Rationale** | [The rationale text explaining WHY this goal matters, with evidence references] |
-| **Measurable Outcome** | [The specific, quantified outcome that proves goal achievement] |
+| **Goal** | [1 sentence max — concise goal statement] |
+| **Rationale** | • [Key evidence/data point from sources]<br>• [Why this matters for the target group]<br>• [Source reference: Author/Institution, Year] |
+| **KPI** | [Single line: specific number + measurable outcome] |
 
-IMPORTANT FORMATTING RULES FOR GOAL TABLES:
-- Each goal gets its OWN separate table preceded by an #### heading.
-- The table has exactly 2 columns: a narrow label column (left) and a wide content column (right).
-- The first row of each table must be empty headers: | | |
-- Use bold (**) for the labels in the left column.
-- Leave a blank line between each goal table.
-- After all goal tables, add 1-2 sentences reflecting on how the goals collectively address the challenge.
+CRITICAL FORMATTING RULES FOR GOAL TABLES:
+- Each goal gets its OWN table preceded by an #### heading.
+- The table has 2 columns with empty headers (| | |).
+- Use bold (**) for labels in the left column.
+- The Goal cell MUST be 1 sentence maximum. Be concise.
+- The Rationale cell MUST use bullet points (• character) separated by <br> tags — NEVER flowing paragraphs. Max 3 bullets.
+- Each bullet should be max 15 words. Extract only the core argument.
+- The KPI cell MUST be a single concise line with a concrete number (e.g., "60 educators trained in digital facilitation across 4 countries").
+- After all goal tables, add 1-2 sentences on how goals collectively address the challenge.
 
 ---
 
 ### Section 5: Target Groups
 
-Convert the target groups JSON into individual tables — one table per target group level. For EACH target group, use this format:
+Convert the target groups JSON into individual cards. For EACH target group level, use this EXACT format:
 
 #### [Level]: [Name]
 
 | | |
 |:--|:--|
-| **Description** | [Description text] |
-| **Characteristics & Needs** | [Characteristics and needs text] |
-| **Role in Project** | [Role in project text] |
-| **Estimated Reach** | [Estimated reach number/text] |
+| **Profile** | • [Who: profession, age range, context]<br>• [Key demographic detail from partner countries] |
+| **Needs** | • [Unmet need 1]<br>• [Unmet need 2] |
+| **Project Role** | • [How they participate or benefit — 1 concrete sentence] |
+| **Reach** | [Single number with brief context, e.g., "60 educators across 4 countries"] |
 
-IMPORTANT: Use the same 2-column label/content table format as the goals section. Each level (PRIMARY, SECONDARY, TERTIARY, QUATERNARY) gets its own table. After all target group tables, add 1-2 sentences explaining the cascade logic: how impact flows from primary through to quaternary level.
+CRITICAL FORMATTING RULES FOR TARGET GROUP TABLES:
+- Each level (PRIMARY, SECONDARY, TERTIARY, QUATERNARY) gets its own table.
+- Use bullet points (• character) separated by <br> tags in cells — NEVER flowing paragraphs.
+- Max 2-3 bullets per cell. Each bullet max 15 words.
+- The Reach cell MUST be a single concise line with a specific number.
+- Renamed fields: "Description" → "Profile", "Characteristics & Needs" split into "Profile" + "Needs", "Role in Project" → "Project Role", "Estimated Reach" → "Reach".
+- After all target group tables, add 1-2 sentences on the cascade logic from primary to quaternary.
 
 ---
 
 ### Section 6: Methodological Approach
 
-For each methodology principle, present it as:
+For each methodology principle, present it as a compact card:
 
 #### [Principle Name]
-[Description paragraph]
 
-After all principles, add a brief closing paragraph (2-3 sentences) explaining how these principles work together as an integrated framework.
+| | |
+|:--|:--|
+| **Approach** | • [Core method in 1 sentence]<br>• [How it is operationalized] |
+| **Linked Goals** | [Which goal numbers this principle serves, e.g., "G1, G3"] |
+
+FORMATTING: Use bullet points (• with <br>), max 2-3 bullets in the Approach cell. Keep each bullet under 15 words.
+
+After all principle cards, add 1-2 sentences explaining how these principles work together as an integrated framework.
 
 ---
 

@@ -142,9 +142,16 @@ export function StarsStep5Summary({ exportToPipeline }: StarsStep5SummaryProps) 
                             background: #eff6ff;
                             border-right: 1px solid #dbeafe;
                         }
-                        td:last-child { width: auto; }
+                        td:last-child {
+                            width: auto;
+                            font-size: 0.88em;
+                            line-height: 1.55;
+                        }
                         tr:nth-child(odd) td:last-child { background: #ffffff; }
                         tr:nth-child(even) td:last-child { background: #f8fafc; }
+
+                        /* Inline bullet points in table cells (• with <br>) */
+                        td br { display: block; margin-top: 0.15em; }
 
                         /* Tight coupling: h4 heading flows directly into its table */
                         h4 + table { margin-top: 0; border-top: none; border-radius: 0 0 6px 6px; }
