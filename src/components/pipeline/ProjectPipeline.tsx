@@ -1458,6 +1458,14 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
     return '';
   };
 
+  // Check if an answer has real content (not just an error placeholder)
+  const ERROR_MARKERS = ['konnte nicht generiert', 'could not be generated', 'Bitte manuell', 'Please fill in manually', 'Beschreibung konnte nicht'];
+  const hasRealAnswer = (answer: string | string[] | AnswerData | undefined): boolean => {
+    const value = getAnswerValue(answer);
+    if (!value || value.trim().length < 20) return false;
+    return !ERROR_MARKERS.some(marker => value.includes(marker));
+  };
+
   // Track answer changes for visual diff highlighting
   const trackAnswerChange = (questionId: string) => {
     if (!pipelineState) return;
@@ -1674,11 +1682,11 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
                     {/* Progress indicator for this partner */}
                     {partnerQuestions.map((q, qi) => {
                       const questionId = `${q.id}_${partner.id}`;
-                      const hasAnswer = !!pipelineState.answers?.[questionId];
+                      const answered = hasRealAnswer(pipelineState.answers?.[questionId]);
                       return (
                         <div
                           key={qi}
-                          className={`w-3 h-3 rounded-full ${hasAnswer ? 'bg-green-500' : 'bg-gray-300'}`}
+                          className={`w-3 h-3 rounded-full ${answered ? 'bg-green-500' : 'bg-gray-300'}`}
                           title={q.text.slice(0, 50) + '...'}
                         />
                       );
@@ -1701,7 +1709,8 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
                       const showImprove = showImproveInput[questionId];
                       const mode = questionEditMode[questionId] || answerData?.mode || 'ai';
                       const isQExpanded = expandedSections[`pq_${questionId}`] === true;
-                      const hasAnswer = !!answerValue;
+                      const hasAnswer = hasRealAnswer(answer);
+                      const isErrorAnswer = !!answerValue && !hasAnswer;
 
                       return (
                         <div key={qIndex} className="border rounded-lg overflow-hidden bg-white shadow-sm">
@@ -1714,7 +1723,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
                               [`pq_${questionId}`]: !isQExpanded
                             }))}
                           >
-                            <span className={`flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 mt-0.5 ${hasAnswer ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                            <span className={`flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 mt-0.5 ${hasAnswer ? 'bg-green-500 text-white' : isErrorAnswer ? 'bg-red-400 text-white' : 'bg-gray-200 text-gray-600'
                               }`}>
                               {qIndex + 1}
                             </span>
@@ -1727,7 +1736,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
                               {q.charLimit && (
                                 <span className={`text-xs font-medium mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded ${answerValue && answerValue.length > q.charLimit
                                   ? 'bg-red-100 text-red-600'
-                                  : answerValue
+                                  : hasAnswer
                                     ? 'bg-green-100 text-green-600'
                                     : 'bg-gray-100 text-gray-500'
                                   }`}>
@@ -2528,7 +2537,8 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
               const showImprove = showImproveInput[item.questionId];
               const mode = questionEditMode[item.questionId] || answerData?.mode || 'ai';
               const isExpanded = expandedSections[`q_${item.questionId}`] === true;
-              const hasAnswer = !!answerValue;
+              const hasAnswer = hasRealAnswer(answer);
+              const isErrorAnswer = !!answerValue && !hasAnswer;
 
               return (
                 <div key={qIndex} className="border rounded-lg overflow-hidden bg-white shadow-sm">
@@ -2542,7 +2552,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
                     }))}
                   >
                     {/* Number Badge */}
-                    <span className={`flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 mt-0.5 ${hasAnswer ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                    <span className={`flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold shrink-0 mt-0.5 ${hasAnswer ? 'bg-green-500 text-white' : isErrorAnswer ? 'bg-red-400 text-white' : 'bg-gray-200 text-gray-600'
                       }`}>
                       {qIndex + 1}
                     </span>
@@ -2556,7 +2566,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
                       {item.charLimit && (
                         <span className={`text-xs font-medium mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded ${answerValue && answerValue.length > item.charLimit
                           ? 'bg-red-100 text-red-600'
-                          : answerValue
+                          : hasAnswer
                             ? 'bg-green-100 text-green-600'
                             : 'bg-gray-100 text-gray-500'
                           }`}>
