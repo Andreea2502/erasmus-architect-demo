@@ -14,6 +14,7 @@ import {
     getAssembleStarsExposePrompt,
     buildPartnershipFactsBlock,
     buildSelectedConceptBlock,
+    buildKpiReferenceBlock,
 } from '@/lib/stars-prompts';
 import { ResearchSource } from '@/types/concept';
 import { StarsGoal, StarsTargetGroup, StarsMethodPrinciple, StarsConceptProposal } from '@/types/stars-concept';
@@ -712,6 +713,9 @@ Antworte im JSON-Format:
             const budget = store.budgetTier || (store.actionType === 'KA220' ? 250000 : 60000);
             const duration = store.duration || (store.actionType === 'KA210' ? 12 : 24);
 
+            // Build KPI reference sheet from user-edited goals and target groups
+            const kpiReference = buildKpiReferenceBlock(store.goals, store.starsTargetGroups);
+
             const prompt = getAssembleStarsExposePrompt(
                 projectTitle,
                 projectAcronym,
@@ -730,7 +734,8 @@ Antworte im JSON-Format:
                 targetGroupsJson,
                 methodologyJson,
                 store.additionalInstructions,
-                partnershipFacts
+                partnershipFacts,
+                kpiReference
             );
 
             const response = await generateContentAction(

@@ -234,6 +234,55 @@ CONCEPT ALIGNMENT RULES:
 }
 
 // ============================================================================
+// KPI REFERENCE BLOCK (extracted from user-edited goals & target groups)
+// ============================================================================
+
+/**
+ * Builds a binding KPI reference sheet from the current goals and target groups.
+ * This is injected into the assembly prompt to prevent number inconsistencies
+ * when the user has manually edited measurable outcomes or reach numbers.
+ */
+export function buildKpiReferenceBlock(
+  goals: { number: number; statement: string; measurableOutcome: string }[],
+  targetGroups: { level: string; name: string; estimatedReach: string }[]
+): string {
+  if (goals.length === 0 && targetGroups.length === 0) return '';
+
+  const goalKpis = goals.map(g =>
+    `  G${g.number}: ${g.measurableOutcome}`
+  ).join('\n');
+
+  const tgKpis = targetGroups.map(tg =>
+    `  ${tg.level}: ${tg.name} — Reach: ${tg.estimatedReach}`
+  ).join('\n');
+
+  return `
+═══════════════════════════════════════════════════════════════════
+VERBINDLICHES KPI-REFERENZBLATT — DIESE ZAHLEN SIND FINAL
+═══════════════════════════════════════════════════════════════════
+
+MESSBARE ERGEBNISSE (aus Projektziele-Tabelle):
+${goalKpis}
+
+ZIELGRUPPEN-REICHWEITEN (aus Zielgruppen-Tabelle):
+${tgKpis}
+
+ABSOLUTE REGELN FÜR ZAHLEN-KONSISTENZ:
+1. JEDE Zahl in diesem Dokument MUSS mit den obigen KPIs übereinstimmen.
+2. Wenn in Section 3.3 (Response) Teilnehmerzahlen genannt werden, MÜSSEN
+   sie mit den Measurable Outcomes aus den Goals identisch sein.
+3. Wenn in Section 5 (Target Groups) Reichweiten genannt werden, MÜSSEN
+   sie mit den obigen Werten übereinstimmen.
+4. Wenn eine Zahl in einem Narrativ (Challenge/Opportunity/Response) vorkommt,
+   die NICHT in den Goals oder Target Groups definiert ist, ENTFERNE sie.
+5. KEINE eigenen Zahlen erfinden. Nur die oben definierten verwenden.
+6. "Train-the-Trainer"-Multiplikatoren nur erwähnen, wenn sie explizit
+   in den Goals als Measurable Outcome definiert sind.
+═══════════════════════════════════════════════════════════════════
+`.trim();
+}
+
+// ============================================================================
 // 0. STARS CONCEPT PROPOSALS PROMPT (3 alternatives)
 // ============================================================================
 
@@ -878,11 +927,14 @@ export function getAssembleStarsExposePrompt(
   targetGroups: string,
   methodology: string,
   additionalInstructions?: string,
-  partnershipFacts?: string
+  partnershipFacts?: string,
+  kpiReference?: string
 ): string {
   return `You are a senior Erasmus+ proposal editor assembling a complete STARS Expose document. Your task is to take pre-written section content and weave it into a single, cohesive, professionally formatted Markdown document.
 
 ${partnershipFacts || ''}
+
+${kpiReference || ''}
 
 PROJECT METADATA:
 - Title: "${projectTitle}"

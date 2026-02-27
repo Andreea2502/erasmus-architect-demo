@@ -421,6 +421,30 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
   }, [store, addSavedConcept]);
 
   // ============================================================================
+  // SAVE INDIVIDUAL CONCEPT PROPOSAL (from Step 2 — any of the 3 proposals)
+  // ============================================================================
+
+  const saveConceptProposalToLibrary = useCallback((concept: any) => {
+    addSavedConcept({
+      title: concept.title || 'Konzeptvorschlag',
+      acronym: concept.acronym || '',
+      priority: concept.euPolicyAlignment?.[0] || '',
+      problemStatement: store.problem || '',
+      innovation: concept.innovation || '',
+      workPackages: [],
+      mainOutputs: concept.mainOutputs || [],
+      expectedImpact: concept.summary || '',
+      consortiumFit: '',
+      status: 'DRAFT',
+      partnerIds: [],
+      initialIdea: store.idea,
+      sector: store.sector as any,
+      actionType: store.actionType as any,
+      conceptMode: 'stars',
+    });
+  }, [store.idea, store.problem, store.sector, store.actionType, addSavedConcept]);
+
+  // ============================================================================
   // DERIVED
   // ============================================================================
 
@@ -623,6 +647,7 @@ export function StarsExposeDeveloper({ resumeProjectId, onSwitchMode }: StarsExp
             handleFileUpload={generation.handleFileUpload}
             generateConceptProposals={generation.generateConceptProposals}
             selectConceptProposal={generation.selectConceptProposal}
+            saveConceptProposal={saveConceptProposalToLibrary}
           />
         )}
 

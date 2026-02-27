@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import {
     BookOpen, Upload, Plus, RefreshCw, AlertTriangle,
     Sparkles, CheckCircle2, X, FileText, Star, Check,
-    ChevronDown, ChevronUp, Lightbulb, Zap, Network
+    ChevronDown, ChevronUp, Lightbulb, Zap, Network, Library,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +61,7 @@ interface StarsStep2SourcesProps {
     handleFileUpload: (files: FileList) => Promise<void>;
     generateConceptProposals: () => Promise<void>;
     selectConceptProposal: (conceptId: string) => void;
+    saveConceptProposal?: (concept: any) => void;
 }
 
 // ============================================================================
@@ -73,11 +74,13 @@ export function StarsStep2Sources({
     handleFileUpload,
     generateConceptProposals,
     selectConceptProposal,
+    saveConceptProposal,
 }: StarsStep2SourcesProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const dropZoneRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = React.useState(false);
     const [expandedConceptId, setExpandedConceptId] = React.useState<string | null>(null);
+    const [savedConceptIds, setSavedConceptIds] = React.useState<Set<string>>(new Set());
 
     const addSourceManually = () => {
         const newSource: ResearchSource = {
@@ -506,8 +509,31 @@ export function StarsStep2Sources({
                                                 </div>
                                             )}
 
-                                            {/* Select Button */}
-                                            <div className="mt-4 flex justify-end">
+                                            {/* Select + Save Buttons */}
+                                            <div className="mt-4 flex items-center justify-between">
+                                                {saveConceptProposal && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={savedConceptIds.has(concept.id)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            saveConceptProposal(concept);
+                                                            setSavedConceptIds(prev => new Set(prev).add(concept.id));
+                                                        }}
+                                                        className={
+                                                            savedConceptIds.has(concept.id)
+                                                                ? 'text-green-600 border-green-200'
+                                                                : 'text-indigo-600 border-indigo-200 hover:bg-indigo-50'
+                                                        }
+                                                    >
+                                                        {savedConceptIds.has(concept.id) ? (
+                                                            <><Check className="h-3.5 w-3.5 mr-1" /> Gespeichert</>
+                                                        ) : (
+                                                            <><Library className="h-3.5 w-3.5 mr-1" /> In Bibliothek</>
+                                                        )}
+                                                    </Button>
+                                                )}
                                                 <Button
                                                     onClick={(e) => { e.stopPropagation(); selectConceptProposal(concept.id); }}
                                                     disabled={isSelected}

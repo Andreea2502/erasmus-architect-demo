@@ -238,6 +238,11 @@ export function StarsStep4Core({
         store.updateField('starsTargetGroups', updated);
     }, [store]);
 
+    const removeTargetGroup = useCallback((tgId: string) => {
+        const updated = store.starsTargetGroups.filter(tg => tg.id !== tgId);
+        store.updateField('starsTargetGroups', updated);
+    }, [store]);
+
     // ========================================================================
     // METHOD PRINCIPLE HELPERS
     // ========================================================================
@@ -246,6 +251,11 @@ export function StarsStep4Core({
         const updated = store.methodPrinciples.map(p =>
             p.id === pId ? { ...p, [field]: value } : p
         );
+        store.updateField('methodPrinciples', updated);
+    }, [store]);
+
+    const removePrinciple = useCallback((pId: string) => {
+        const updated = store.methodPrinciples.filter(p => p.id !== pId);
         store.updateField('methodPrinciples', updated);
     }, [store]);
 
@@ -532,7 +542,7 @@ export function StarsStep4Core({
                                 className={`rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow border-l-4 ${borderColor}`}
                             >
                                 <div className="p-4 space-y-3">
-                                    {/* Level badge + Name */}
+                                    {/* Level badge + Name + Delete */}
                                     <div className="flex items-center gap-3">
                                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${levelColor}`}>
                                             {levelLabel.de}
@@ -543,6 +553,13 @@ export function StarsStep4Core({
                                             onChange={e => updateTargetGroup(tg.id, 'name', e.target.value)}
                                             className="flex-1 font-semibold text-gray-900 text-sm bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-indigo-400 focus:outline-none px-1 py-0.5 transition-colors"
                                         />
+                                        <button
+                                            onClick={() => removeTargetGroup(tg.id)}
+                                            className="text-red-400 hover:text-red-600 p-1 transition-colors shrink-0"
+                                            title="Zielgruppe entfernen"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
                                     </div>
 
                                     {/* Fields grid */}
@@ -658,12 +675,21 @@ export function StarsStep4Core({
                                 key={principle.id}
                                 className={`rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow border-l-4 ${borderColor} p-4`}
                             >
-                                <input
-                                    type="text"
-                                    value={principle.name}
-                                    onChange={e => updatePrinciple(principle.id, 'name', e.target.value)}
-                                    className="w-full font-bold text-gray-900 text-sm bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-indigo-400 focus:outline-none px-0 py-1 mb-2 transition-colors"
-                                />
+                                <div className="flex items-center gap-2 mb-2">
+                                    <input
+                                        type="text"
+                                        value={principle.name}
+                                        onChange={e => updatePrinciple(principle.id, 'name', e.target.value)}
+                                        className="flex-1 font-bold text-gray-900 text-sm bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-indigo-400 focus:outline-none px-0 py-1 transition-colors"
+                                    />
+                                    <button
+                                        onClick={() => removePrinciple(principle.id)}
+                                        className="text-red-400 hover:text-red-600 p-1 transition-colors shrink-0"
+                                        title="Prinzip entfernen"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
                                 <Textarea
                                     value={principle.description}
                                     onChange={e => updatePrinciple(principle.id, 'description', e.target.value)}
