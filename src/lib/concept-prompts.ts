@@ -13,6 +13,7 @@ export const ERASMUS_PRIORITIES = [
   { value: 'Digitaler Wandel', label: 'Digitaler Wandel' },
   { value: 'Umwelt und Bekämpfung des Klimawandels', label: 'Umwelt und Bekämpfung des Klimawandels' },
   { value: 'Teilhabe am demokratischen Leben', label: 'Teilhabe am demokratischen Leben' },
+  { value: 'Union of Skills', label: 'Union of Skills' },
   { value: 'Anderes', label: 'Anderes (selbst eintragen)' },
 ];
 
@@ -425,6 +426,12 @@ Jede Aktivität soll:
 - Einem Partner zugeordnet sein
 - Einen realistischen Zeitrahmen haben (START und END Monat müssen in die Gesamtlaufzeit von ${durationMonths} Monaten passen!)
 
+STRUKTURTREUE-REGELN (BINDEND):
+- Wenn die ZUSÄTZLICHEN ANWEISUNGEN eine bestimmte Anzahl an Aktivitäten vorgeben, erstelle EXAKT diese Anzahl.
+- Wenn das Konzept Lead-Zuordnungen vorgibt, übernimm diese 1:1.
+- Das Akronym "${selectedConcept.acronym}" ist GESPERRT — nicht modifizieren.
+- Nenne jeden Lead-Partner beim EXAKTEN Namen aus dem KONSORTIUM-Block.
+
 ⚠️ VERTEILUNG DER LAUFZEIT:
 Verteile die Aktivitäten logisch über die ${durationMonths} Monate Laufzeit. Gehe NICHT automatisch von 24 Monaten aus! Die letzte Aktivität muss spätestens in Monat ${durationMonths} enden.
 
@@ -439,7 +446,7 @@ Antworte im JSON-Format:
       "activities": ["Teilschritt 1", "Teilschritt 2"],
       "deliverables": ["Ergebnis 1"],
       "duration": { "start": 1, "end": ${Math.round(durationMonths / 3)} },
-      "lead": "Welcher Partner führt diese Aktivität"
+      "lead": "EXAKTER Name des Lead-Partners aus dem Konsortium"
     }
   ]
 }
@@ -480,6 +487,27 @@ Jedes WP soll:
 - Einem Konsortium-Partner zugeordnet sein
 - Einen realistischen Zeitrahmen haben (START und END Monat müssen in die Laufzeit von ${durationMonths} Monaten passen!)
 
+═══════════════════════════════════════════════════════════════════
+STRUKTURTREUE-REGELN (BINDEND)
+═══════════════════════════════════════════════════════════════════
+
+1. WP-STRUKTUR-LOCK:
+   - Wenn die ZUSÄTZLICHEN ANWEISUNGEN oder das Konzept eine bestimmte Anzahl an WPs vorgeben (z.B. "3 WPs" oder "WP1, WP2, WP3"), dann erstelle EXAKT diese Anzahl. NICHT mehr, NICHT weniger.
+   - Wenn das Konzept WP-Titel oder WP-Leads vorgibt, übernimm diese 1:1.
+   - Du darfst die vorgegebene WP-Struktur NICHT "verbessern" oder "erweitern".
+
+2. WP-LEAD-KONSISTENZ:
+   - JEDES WP muss GENAU EINEM Lead-Partner zugewiesen sein.
+   - Nenne den Lead-Partner beim EXAKTEN Namen/Kürzel aus dem KONSORTIUM-Block.
+   - Der Lead muss in der GESAMTEN Beschreibung des WP konsistent bleiben.
+   - Wenn das Konzept vorgibt, wer welches WP leitet, übernimm das 1:1.
+
+3. AKRONYM-LOCK:
+   - Das Projektakronym "${selectedConcept.acronym}" ist GESPERRT.
+   - Verwende es EXAKT so — NICHT modifizieren, ergänzen oder abkürzen.
+   - Schreibe NICHT "${selectedConcept.acronym} AI" oder "${selectedConcept.acronym}+" o.ä.
+═══════════════════════════════════════════════════════════════════
+
 ⚠️ VERTEILUNG DER LAUFZEIT:
 Verteile die Aktivitäten logisch über die ${durationMonths} Monate. Gehe NICHT automatisch von 24 Monaten aus! Das letzte WP (Dissemination) muss im Monat ${durationMonths} enden.
 
@@ -494,7 +522,7 @@ Antworte im JSON-Format:
       "activities": ["Aktivität 1", "Aktivität 2"],
       "deliverables": ["Deliverable 1", "Deliverable 2"],
       "duration": { "start": 1, "end": ${durationMonths} },
-      "lead": "Welcher Partnertyp führt dieses WP"
+      "lead": "EXAKTER Name des Lead-Partners aus dem Konsortium"
     }
   ]
 }
@@ -561,6 +589,41 @@ WICHTIGE LOGIK- UND WORTWAHL-REGELN (ÜBERALL ANWENDEN):
 - KEINE BUZZWORDS: Ersetze leere Begriffe wie "AI-based learning companion" durch konkrete, machbare technische Ansätze (z.B. "Web-basierte Applikation mit Anbindung an existierende LLM-APIs").
 - KEINE FLASCHENHÄLSE (Bottlenecks): Mache deutlich, dass Work Packages überlappend und agil stattfinden ("Development starts based on preliminary analysis findings...").
 - TRAIN-THE-TRAINER: Wenn Pädagogen ausgebildet werden, mache explizit deutlich, dass sie diese Tools in Pilottests mit IHREN Lernenden erproben. Der logische Klebstoff dazwischen muss im Konzept deutlich werden.
+
+═══════════════════════════════════════════════════════════════════
+STRUKTURTREUE-REGELN (BINDEND — Verletzung = Disqualifikation)
+═══════════════════════════════════════════════════════════════════
+
+1. WP-STRUKTUR-LOCK:
+   - Die oben definierten Work Packages sind BINDEND. Übernimm EXAKT die Anzahl, Titel und Reihenfolge der WPs aus "STRUKTUR/ARBEITSPAKETE".
+   - KEINE WPs hinzufügen, entfernen oder umbenennen.
+   - Wenn 3 WPs definiert sind, schreibe über GENAU 3 WPs. Nicht 5, nicht 4.
+
+2. WP-LEAD-KONSISTENZ:
+   - Jeder WP-Lead muss in JEDER Erwähnung im gesamten Dokument identisch sein.
+   - Wenn in den WP-Daten steht "Lead: Ekologija", dann darf NIRGENDS im Text stehen, dass ein anderer Partner dieses WP leitet.
+   - VOR dem Fertigstellen: Scanne jeden Abschnitt und prüfe, ob WP-Lead-Zuordnungen konsistent sind.
+
+3. AKRONYM-LOCK:
+   - Das Akronym "${selectedConcept.acronym}" ist GESPERRT. Verwende es EXAKT so.
+   - NICHT modifizieren (kein "${selectedConcept.acronym} AI", kein "${selectedConcept.acronym}+" etc.).
+
+4. PRIORITÄTEN-TREUE:
+   - ALLE Erasmus+ Prioritäten aus dem Konzept müssen im Dokument erscheinen.
+   - KEINE Priorität weglassen oder durch andere ersetzen.
+
+5. PARTNER-COMMITMENTS BEIBEHALTEN:
+   - Wenn im Konzept oder in den Zusatzanweisungen KONKRETE Verpflichtungen einzelner Partner stehen
+     (z.B. "Partner X übernimmt Hosting-Kosten für 2 Jahre nach Projektende"),
+     dann MÜSSEN diese exakt so übernommen werden.
+   - Ersetze sie NICHT durch generische Formulierungen (z.B. "Ergebnisse werden für mindestens 5 Jahre gehostet").
+
+6. BUDGET-MATHEMATIK (Sanity Check):
+   - Wenn Budgetprozente für WPs genannt werden: Sie MÜSSEN exakt 100% ergeben.
+   - Wenn absolute EUR-Beträge für WPs genannt werden: Sie MÜSSEN exakt die Antragssumme ergeben.
+   - JEDER Prozentsatz muss zu seinem EUR-Betrag passen (X% von Gesamtbudget = Y EUR).
+   - VOR dem Fertigstellen: Rechne die Summen nach. Wenn sie nicht stimmen, korrigiere sie.
+═══════════════════════════════════════════════════════════════════
 
 REGELN FÜR DIE AUSGABE:
 - Ausschließlich Markdown (kein JSON!)

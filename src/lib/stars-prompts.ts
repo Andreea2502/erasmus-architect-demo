@@ -363,8 +363,9 @@ FOR EACH CONCEPT, PROVIDE:
 6. "mainOutputs": An array of 3-5 concrete project outputs/deliverables. Each must be a tangible, verifiable item (e.g., "Open-access digital toolkit with 15 ready-to-use workshop modules", NOT "innovative resources").
 
 7. "euPolicyAlignment": An array of 2-4 EU policy area IDs from this list:
-   DIGITAL_TRANSFORMATION, SOCIAL_ECONOMY, CIVIL_SOCIETY_RESILIENCE, INCLUSION_DIVERSITY, GREEN_TRANSITION, EUROPEAN_EDUCATION_AREA, DIGITAL_EDUCATION_ACTION_PLAN, SKILLS_AGENDA, YOUTH_STRATEGY, DEMOCRATIC_PARTICIPATION
+   DIGITAL_TRANSFORMATION, SOCIAL_ECONOMY, CIVIL_SOCIETY_RESILIENCE, INCLUSION_DIVERSITY, GREEN_TRANSITION, EUROPEAN_EDUCATION_AREA, DIGITAL_EDUCATION_ACTION_PLAN, SKILLS_AGENDA, YOUTH_STRATEGY, DEMOCRATIC_PARTICIPATION, UNION_OF_SKILLS
    Select only those that genuinely align with the concept.
+   IMPORTANT: If the user's PRIORITY FOCUS mentions any of these policy areas, you MUST include them in the alignment array.
 
 DIFFERENTIATION RULES:
 - Concept 1: Focus on CAPACITY BUILDING — the primary mechanism is training, upskilling, or competence development.
@@ -634,6 +635,18 @@ WRITING STYLE:
 - Bullets are the ONLY place where a list format is permitted.
 - Every bullet must describe something tangible and verifiable -- no vague intentions.
 - All country references, participant numbers, and languages must match PARTNERSHIP FACTS.
+
+STRUCTURAL FIDELITY:
+- If the CONCEPT DIRECTION defines a specific number of WPs or action pillars, generate EXACTLY that number -- no more, no fewer.
+- Each WP/pillar must have ONE clear lead partner. Name the lead partner using their EXACT name from the PARTNERSHIP FACTS.
+- Do NOT assign different lead partners to the same WP in different parts of the text.
+- If the concept assigns specific WP leads, preserve those assignments exactly.
+
+BUDGET MATHEMATICS (if you mention budget percentages or amounts):
+- All WP/pillar percentages MUST sum to exactly 100%.
+- All WP/pillar EUR amounts MUST sum to exactly the project budget from PARTNERSHIP FACTS.
+- Each percentage must match its EUR amount. Cross-check: X% of total budget = Y EUR.
+- If you cannot make the numbers sum correctly, OMIT specific budget percentages rather than writing incorrect ones.
 
 ${ANTI_BUZZWORD_RULES}
 
@@ -1105,12 +1118,54 @@ ASSEMBLY RULES:
 6. Convert any JSON data into readable formatted sections -- no raw JSON in the output.
 7. If associated partners data is empty or "none," simply omit Section 2.3.
 
+═══════════════════════════════════════════════════════════════════
+STRUCTURAL FIDELITY RULES (BINDING — violation = document rejection)
+═══════════════════════════════════════════════════════════════════
+
+A. ACRONYM LOCK:
+   - The acronym "${projectAcronym}" is LOCKED. Use it EXACTLY as provided throughout the document.
+   - Do NOT modify, extend, or abbreviate it (no "${projectAcronym} AI", no "${projectAcronym}+", etc.).
+   - In Section 1 table AND in the document title, use EXACTLY: ${projectAcronym}
+
+B. EU POLICY ALIGNMENT — COMPLETE LIST:
+   - Section 1 MUST list ALL of these policies: ${euPolicyAlignment.join(', ')}
+   - Do NOT omit any. Do NOT replace any with different policy names.
+   - Do NOT add policies that are not in this list.
+   - This list comes directly from the user's concept and is non-negotiable.
+
+C. WP STRUCTURE PRESERVATION:
+   - The Work Package structure defined in the pre-written content is BINDING.
+   - If the Response section lists 3 action pillars for 3 WPs, the document must have 3 WPs — not 5.
+   - Do NOT add, remove, split, or merge Work Packages.
+   - Do NOT rename WPs. Keep exact titles from the input.
+
+D. WP LEAD CONSISTENCY:
+   - Each WP lead assignment must be IDENTICAL in every mention throughout the ENTIRE document.
+   - If the input says "WP2 led by Partner X", then in Section 2.2, Section 3.3, Section 4, and Section 6, the same partner must be named as WP2 lead.
+   - BEFORE finalizing: scan the entire document for WP lead mentions and verify they match.
+
+E. PARTNER COMMITMENT PRESERVATION:
+   - Specific partner commitments stated in the pre-written content (e.g., "Partner X will cover hosting costs for 2 years post-project") MUST be preserved EXACTLY.
+   - Do NOT replace specific commitments with generic phrases (e.g., "results will be hosted for at least 5 years").
+   - Sustainability commitments are binding contractual promises — do not generalize them.
+
+F. BUDGET MATHEMATICS (Sanity Check — perform BEFORE outputting):
+   - If budget percentages per WP are mentioned: they MUST sum to exactly 100%.
+   - If absolute EUR amounts per WP are mentioned: they MUST sum to exactly ${budget.toLocaleString()} EUR.
+   - Each percentage MUST match its EUR amount: X% of ${budget.toLocaleString()} EUR = Y EUR (verify the multiplication).
+   - If you detect a mismatch, CORRECT the numbers before including them.
+   - NEVER write percentages that sum to more than 100% or amounts that sum to more than the budget.
+═══════════════════════════════════════════════════════════════════
+
 CRITICAL CONSISTENCY CHECK (do this BEFORE outputting the document):
 8. Scan ALL sections for country names. If ANY country appears that is NOT in the PARTNERSHIP FACTS block, REMOVE or REPLACE it with the correct partner country.
 9. Scan ALL sections for "across X countries" statements. X must ALWAYS match the actual partner country count.
 10. Scan ALL sections for participant/beneficiary numbers. They must be consistent across Goals, Target Groups, Response, and Methodology. If you find contradictions, use the smaller, more conservative number everywhere.
 11. Scan ALL sections for language references. Translation languages must match partner country languages + English.
 12. Scan ALL sections for event descriptions. No "European conference" unless the budget exceeds 250,000 EUR. Scale events to local/national multiplier events instead.
+13. Scan ALL sections for WP lead assignments — verify they are consistent across the entire document.
+14. Verify the project acronym appears EXACTLY as "${projectAcronym}" everywhere — no modifications.
+15. Verify all EU policy alignment entries from the metadata appear in Section 1.
 
 ${ANTI_BUZZWORD_RULES}
 
@@ -1176,6 +1231,14 @@ ABSOLUTE REGELN:
 - Wenn das Feedback widersprüchlich ist (z.B. "mehr Teilnehmer" aber "kleineres Budget"), folge der konservativeren Interpretation und weise im Text nicht darauf hin.
 - Das Ergebnis muss sofort als PDF exportierbar sein — keine Platzhalter, keine Kommentare, keine "TODO"-Marker.
 - PARTNERSHIP FACTS sind unveränderlich. Wenn das Feedback Länder oder Partner vorschlägt, die nicht im Konsortium sind, ignoriere das.
+
+STRUKTURTREUE-REGELN (auch bei Revision BINDEND):
+- Das Akronym des Projekts ist GESPERRT — nicht modifizieren, ergänzen oder abkürzen.
+- Die Anzahl der Work Packages NICHT verändern, es sei denn das Feedback fordert dies EXPLIZIT.
+- WP-Lead-Zuordnungen müssen im gesamten Dokument konsistent bleiben.
+- Wenn Budgetprozente/-beträge geändert werden: Summen MÜSSEN exakt 100% bzw. die Antragssumme ergeben.
+- Konkrete Partner-Commitments (z.B. Hosting-Kosten für X Jahre) NICHT durch generische Formulierungen ersetzen.
+- EU-Prioritäten aus Section 1 NICHT entfernen oder durch andere ersetzen, es sei denn das Feedback fordert es explizit.
 
 ${ANTI_BUZZWORD_RULES}
 
