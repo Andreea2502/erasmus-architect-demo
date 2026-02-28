@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAppStore } from "@/store/app-store";
@@ -31,7 +31,129 @@ import {
   FileText,
   Globe,
   Lightbulb,
+  Pencil,
 } from "lucide-react";
+
+// ============================================================================
+// INLINE EDIT — click to rename
+// ============================================================================
+
+function InlineEdit({
+  value,
+  onSave,
+  className = '',
+  textClassName = '',
+}: {
+  value: string;
+  onSave: (v: string) => void;
+  className?: string;
+  textClassName?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value);
+
+  useEffect(() => { setText(value); }, [value]);
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { onSave(text); setEditing(false); }
+          if (e.key === 'Escape') { setText(value); setEditing(false); }
+        }}
+        onBlur={() => { if (text !== value) onSave(text); setEditing(false); }}
+        className={`w-full px-1.5 py-0.5 border border-orange-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white ${className}`}
+      />
+    );
+  }
+  return (
+    <span
+      className={`cursor-pointer hover:bg-orange-50 rounded px-0.5 group inline-flex items-center gap-1 ${textClassName}`}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setText(value); setEditing(true); }}
+      title="Umbenennen"
+    >
+      {value || '(kein Titel)'}
+      <Pencil className="w-3 h-3 text-orange-300 opacity-0 group-hover:opacity-100 shrink-0" />
+    </span>
+  );
+}
+
+// ============================================================================
+// DRAFT NOTE — small editable note per draft
+// ============================================================================
+
+function DraftNote({ projectId, currentNote }: { projectId: string; currentNote: string }) {
+  const updateProject = useAppStore((state) => state.updateProject);
+  const [isEditing, setIsEditing] = useState(false);
+  const [note, setNote] = useState(currentNote);
+
+  useEffect(() => { setNote(currentNote); }, [currentNote]);
+
+  const handleSave = () => {
+    const project = useAppStore.getState().projects.find(p => p.id === projectId);
+    if (project) {
+      updateProject(projectId, {
+        generatorState: {
+          ...project.generatorState,
+          draftNote: note.trim(),
+        },
+      } as any);
+    }
+    setIsEditing(false);
+  };
+
+  if (!isEditing && !currentNote) {
+    return (
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
+        className="text-xs text-gray-400 hover:text-orange-500 flex items-center gap-1 transition-colors"
+      >
+        <StickyNote size={12} />
+        + Notiz hinzufügen
+      </button>
+    );
+  }
+
+  if (isEditing) {
+    return (
+      <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+        <textarea
+          autoFocus
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSave(); }
+            if (e.key === 'Escape') { setNote(currentNote); setIsEditing(false); }
+          }}
+          onBlur={handleSave}
+          placeholder="z.B. Version mit Surveys, Evaluator-Feedback..."
+          className="w-full px-2 py-1.5 border border-orange-300 rounded-lg text-xs bg-orange-50 resize-none focus:outline-none focus:ring-1 focus:ring-orange-400"
+          rows={2}
+          maxLength={200}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsEditing(true); }}
+      className="bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 text-xs text-amber-800 cursor-pointer hover:bg-amber-100 flex items-center gap-1.5 transition-colors"
+      title="Klicken zum Bearbeiten"
+    >
+      <StickyNote size={12} className="text-amber-500 shrink-0" />
+      <span className="truncate">{currentNote}</span>
+      <Pencil className="w-2.5 h-2.5 text-amber-400 opacity-0 group-hover:opacity-100 shrink-0 ml-auto" />
+    </div>
+  );
+}
+
+// ============================================================================
+// STATUS MAPS
+// ============================================================================
 
 const statusIcons = {
   CONCEPT: Lightbulb,
@@ -59,11 +181,20 @@ export function ProjectList() {
   const projects = useAppStore((state) => state.projects);
   const partners = useAppStore((state) => state.partners);
   const deleteProject = useAppStore((state) => state.deleteProject);
+  const updateProject = useAppStore((state) => state.updateProject);
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') === 'drafts' ? 'drafts' : 'all';
   const [activeTab, setActiveTab] = useState<'all' | 'drafts'>(initialTab);
   const [search, setSearch] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+  // Auto-dismiss delete confirmation after 3 seconds
+  useEffect(() => {
+    if (showDeleteConfirm) {
+      const timer = setTimeout(() => setShowDeleteConfirm(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showDeleteConfirm]);
 
   const filteredProjects = projects
     .filter(
@@ -309,26 +440,61 @@ export function ProjectList() {
                     key={project.id}
                     className="bg-white rounded-xl border p-5 hover:shadow-lg transition-all"
                   >
-                    {/* Top: Badges */}
-                    <div className="flex items-center gap-2 mb-3">
+                    {/* Top: Badges + Short ID */}
+                    <div className="flex items-center gap-2 mb-2">
                       <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-xs font-medium">
                         Entwurf
                       </span>
                       <span className="bg-[#003399]/10 text-[#003399] px-2 py-1 rounded-full text-xs font-medium">
                         {ACTION_TYPE_LABELS[project.actionType]}
                       </span>
-                      <span className="text-xs text-gray-400 ml-auto">
+                      <span className="text-[10px] text-gray-400 font-mono bg-gray-50 px-1.5 py-0.5 rounded">
+                        #{project.id.substring(0, 6)}
+                      </span>
+                      <span className="text-xs text-gray-400 ml-auto" title={formatDateTime(lastUpdate)}>
                         {getRelativeTime(lastUpdate)}
                       </span>
                     </div>
 
-                    {/* Title */}
+                    {/* Creation date + Source concept */}
+                    <div className="flex items-center gap-3 text-[11px] text-gray-400 mb-2">
+                      <span className="flex items-center gap-1">
+                        <Calendar size={11} />
+                        Erstellt: {formatDateTime(project.createdAt)}
+                      </span>
+                      {(project as any).originalConcept?.initialIdea && (
+                        <span className="flex items-center gap-1 truncate max-w-[200px]" title={(project as any).originalConcept.initialIdea}>
+                          <Lightbulb size={11} />
+                          {(project as any).originalConcept.initialIdea.substring(0, 40)}...
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Title — Inline Editable */}
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {project.acronym || project.title || 'Untitled'}
+                      <InlineEdit
+                        value={project.acronym || project.title || 'Untitled'}
+                        onSave={(v) => updateProject(project.id, project.acronym ? { acronym: v } : { title: v })}
+                        textClassName="text-lg font-semibold"
+                      />
                     </h3>
                     {project.acronym && project.title && (
-                      <p className="text-sm text-gray-500 mb-3 truncate">{project.title}</p>
+                      <div className="text-sm text-gray-500 mb-1">
+                        <InlineEdit
+                          value={project.title}
+                          onSave={(v) => updateProject(project.id, { title: v })}
+                          textClassName="text-sm text-gray-500"
+                        />
+                      </div>
                     )}
+
+                    {/* Draft Note */}
+                    <div className="mb-2">
+                      <DraftNote
+                        projectId={project.id}
+                        currentNote={(project.generatorState as any)?.draftNote || ''}
+                      />
+                    </div>
 
                     {/* Step Progress Visual */}
                     <div className="mt-3">
@@ -379,14 +545,17 @@ export function ProjectList() {
                           ? handleDelete(project.id)
                           : setShowDeleteConfirm(project.id)
                         }
-                        className={`px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                        className={`px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-1.5 ${
                           showDeleteConfirm === project.id
-                            ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                            ? 'bg-red-100 text-red-600 hover:bg-red-200 ring-1 ring-red-300'
                             : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
                         }`}
                         title={showDeleteConfirm === project.id ? 'Klicken zum Bestätigen' : 'Löschen'}
                       >
                         <Trash2 size={16} />
+                        {showDeleteConfirm === project.id && (
+                          <span className="text-xs font-medium">Löschen?</span>
+                        )}
                       </button>
                     </div>
                   </div>

@@ -381,9 +381,28 @@ export function useProjectPipeline(initialProjectId?: string) {
         };
 
         if (currentProjectId) {
+            // Preserve draftNote from existing project
+            const existingProject = useAppStore.getState().projects.find(p => p.id === currentProjectId);
+            const existingDraftNote = (existingProject?.generatorState as any)?.draftNote;
+            if (existingDraftNote) {
+                (commonData.generatorState as any).draftNote = existingDraftNote;
+            }
             updateProject(currentProjectId, commonData as any);
             setProjectSaved(true);
         } else {
+            // Auto-suffix duplicate titles for new projects
+            const existingProjects = useAppStore.getState().projects;
+            const sameTitle = existingProjects.filter(p => p.title === commonData.title);
+            if (sameTitle.length > 0) {
+                const now = new Date();
+                const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                commonData.title = `${commonData.title} (${dateStr} ${timeStr})`;
+                if (commonData.acronym) {
+                    commonData.acronym = `${commonData.acronym} v${sameTitle.length + 1}`;
+                }
+            }
+
             const newProjectId = addProject({
                 ...commonData,
                 status: 'IN_PROGRESS',
