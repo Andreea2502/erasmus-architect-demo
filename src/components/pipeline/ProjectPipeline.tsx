@@ -107,6 +107,7 @@ import { WP_TEMPLATES, getRecommendedWPStructure, validateWPAssignment, type WPT
 import { WorkPackageConfigurator, type WPConfiguration } from '@/components/pipeline/WorkPackageConfigurator';
 import { WPBudgetConfigurator, type WPBudgetConfig } from '@/components/pipeline/WPBudgetConfigurator';
 import { ProposalEvaluator } from '@/components/pipeline/ProposalEvaluator';
+import WorkPackageOverview from '@/components/pipeline/WorkPackageOverview';
 // PartnerSkillsMatrix removed — expertise tags were inaccurate and had no effect on generation
 
 // ============================================================================
@@ -210,6 +211,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
   };
 
   const [generatingActivityId, setGeneratingActivityId] = useState<string | null>(null);
+  const [showWPOverview, setShowWPOverview] = useState(false);
 
   const handleRegenerateActivity = async (wpIndex: number, actNum: number) => {
     if (!pipelineState) return;
@@ -1578,6 +1580,44 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
   // Handle save for partner-specific answers (same logic as manual save)
   const handleSavePartnerAnswer = (questionId: string) => {
     handleSaveManualAnswer(questionId);
+  };
+
+  // Handle WP Overview updates — syncs back to both answers and workPackages
+  const handleOverviewUpdateAnswer = (questionId: string, value: string) => {
+    if (!pipelineState) return;
+    setPipelineState(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        answers: {
+          ...prev.answers,
+          [questionId]: {
+            value,
+            mode: 'manual' as const,
+            lastEditedAt: new Date().toISOString()
+          }
+        }
+      };
+    });
+  };
+
+  const handleOverviewUpdateWorkPackage = (wpIndex: number, updates: Partial<any>) => {
+    if (!pipelineState) return;
+    setPipelineState(prev => {
+      if (!prev || !prev.workPackages) return prev;
+      const newWPs = [...prev.workPackages];
+      newWPs[wpIndex] = { ...newWPs[wpIndex], ...updates };
+
+      // Also sync title changes to the answer record
+      if (updates.title) {
+        const wpNum = newWPs[wpIndex].number;
+        const newAnswers = { ...prev.answers };
+        // WP title is not a separate answer key, but we keep answers in sync
+        return { ...prev, workPackages: newWPs, answers: newAnswers };
+      }
+
+      return { ...prev, workPackages: newWPs };
+    });
   };
 
   // Handle AI generation for partner-specific question
@@ -3244,10 +3284,19 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
 
     return (
       <div className="space-y-12 mt-8 border-t pt-8">
-        <h3 className="text-xl font-bold text-[#003399] flex items-center gap-2 mb-6">
-          <Layers className="h-6 w-6" />
-          {pipelineState.configuration?.actionType === 'KA210' ? 'Activities Details' : 'Work Packages Overview'}
-        </h3>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-[#003399] flex items-center gap-2">
+            <Layers className="h-6 w-6" />
+            {pipelineState.configuration?.actionType === 'KA210' ? 'Activities Details' : 'Work Packages Overview'}
+          </h3>
+          <button
+            onClick={() => setShowWPOverview(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
+          >
+            <Layers className="w-4 h-4" />
+            {language === 'de' ? 'WP-Dashboard öffnen' : 'Open WP Dashboard'}
+          </button>
+        </div>
 
         {pipelineState.workPackages.map((wp, idx) => (
           <div key={wp.id || idx} className="bg-slate-50/50 p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -3701,6 +3750,21 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {/* WP Overview Dashboard - Full Screen Overlay */}
+      {showWPOverview && pipelineState.workPackages && pipelineState.workPackages.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-gray-50 overflow-auto">
+          <div className="max-w-[1400px] mx-auto p-6">
+            <WorkPackageOverview
+              pipelineState={pipelineState}
+              onUpdateAnswer={handleOverviewUpdateAnswer}
+              onUpdateWorkPackage={handleOverviewUpdateWorkPackage}
+              language={language}
+              onClose={() => setShowWPOverview(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Header with Project Info */}
       <div className="bg-gradient-to-r from-[#003399] to-[#0055cc] rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
