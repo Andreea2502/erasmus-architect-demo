@@ -3756,6 +3756,7 @@ export function ProjectPipeline({ initialProjectId }: ProjectPipelineProps) {
           <div className="max-w-[1400px] mx-auto p-6">
             <WorkPackageOverview
               pipelineState={pipelineState}
+              wpConfigurations={wpConfigurations}
               onUpdateAnswer={handleOverviewUpdateAnswer}
               onUpdateWorkPackage={handleOverviewUpdateWorkPackage}
               language={language}
