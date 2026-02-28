@@ -3784,3 +3784,58 @@ export function createInitialPipelineState(
     answers: {}
   };
 }
+
+// ============================================================================
+// DASHBOARD REGENERATION — Regenerate a specific WP section with user input
+// ============================================================================
+
+export async function regenerateWPSection(
+  state: PipelineState,
+  wpNumber: number,
+  answerKey: string,
+  userInstruction: string,
+  existingText: string,
+  mode: 'replace' | 'enhance',
+  language: string
+): Promise<{ newText: string }> {
+  const wp = state.workPackages?.find(w => w.number === wpNumber);
+  const wpTitle = wp?.title || `Work Package ${wpNumber}`;
+  const projectContext = `Projekt: ${state.projectTitle || ''} (${state.acronym || ''})
+Arbeitspaket WP${wpNumber}: ${wpTitle}
+Partner: ${state.consortium.map(p => `${p.name} (${p.country})`).join(', ')}`;
+
+  const actionLabel = mode === 'replace'
+    ? (language === 'de' ? 'ERSETZE den bestehenden Text komplett' : 'REPLACE the existing text completely')
+    : (language === 'de' ? 'ERWEITERE und VERBESSERE den bestehenden Text' : 'ENHANCE and IMPROVE the existing text');
+
+  const prompt = `Du bist ein Erasmus+ Experte. ${actionLabel} für den folgenden Abschnitt eines Projektantrags.
+
+KONTEXT:
+${projectContext}
+
+BENUTZER-ANWEISUNG:
+"${userInstruction}"
+
+${existingText ? `BESTEHENDER TEXT:
+---
+${existingText}
+---` : 'Es gibt noch keinen bestehenden Text.'}
+
+AUFGABE:
+${mode === 'replace'
+    ? 'Schreibe einen komplett neuen Text basierend auf der Benutzer-Anweisung. Der neue Text soll den alten ersetzen.'
+    : 'Baue die Benutzer-Anweisung in den bestehenden Text ein. Erweitere ihn, mache ihn besser und konkreter.'}
+
+REGELN:
+- Schreibe professionell und spezifisch für Erasmus+
+- Verwende konkrete Zahlen, Methoden und Zeitrahmen
+- Nenne die Projektpartner wo relevant
+- Halte die ungefähre Länge des bestehenden Textes bei (${existingText ? `ca. ${existingText.split(/\s+/).length} Wörter` : '200-400 Wörter'})
+- Schreibe in ${language === 'de' ? 'Deutsch' : 'Englisch'}
+- Gib NUR den neuen Text zurück, keine Erklärungen oder Metakommentare`;
+
+  const systemContext = `Erasmus+ application writing expert. Rewrite or enhance specific sections of project proposals based on evaluator feedback.`;
+
+  const response = await callGeminiForPipeline(prompt, systemContext, 0.6);
+  return { newText: response.trim() };
+}

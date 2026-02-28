@@ -5,6 +5,7 @@ import {
   PipelineState,
   WorkPackage,
   AnswerData,
+  regenerateWPSection,
 } from '@/lib/project-pipeline';
 import {
   STANDARD_ACTIVITIES,
@@ -28,6 +29,11 @@ import {
   ChevronDown,
   ChevronUp,
   Target,
+  Sparkles,
+  RefreshCw,
+  Check,
+  ArrowRight,
+  MessageSquare,
 } from 'lucide-react';
 
 // ============================================================================
@@ -339,13 +345,202 @@ function InlineEdit({ value, onSave }: { value: string; onSave: (v: string) => v
 }
 
 // ============================================================================
+// REGENERATE MODAL — Side-by-side diff preview
+// ============================================================================
+
+interface RegenRequest {
+  wpNumber: number;
+  answerKey: string;
+  label: string;
+  oldText: string;
+}
+
+function RegenerateModal({
+  request,
+  pipelineState,
+  language,
+  onAccept,
+  onClose,
+}: {
+  request: RegenRequest;
+  pipelineState: PipelineState;
+  language: string;
+  onAccept: (answerKey: string, newText: string) => void;
+  onClose: () => void;
+}) {
+  const [instruction, setInstruction] = useState('');
+  const [mode, setMode] = useState<'replace' | 'enhance'>('enhance');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [newText, setNewText] = useState('');
+  const [editableNew, setEditableNew] = useState('');
+  const [showResult, setShowResult] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!instruction.trim()) return;
+    setIsGenerating(true);
+    try {
+      const result = await regenerateWPSection(
+        pipelineState,
+        request.wpNumber,
+        request.answerKey,
+        instruction,
+        request.oldText,
+        mode,
+        language
+      );
+      setNewText(result.newText);
+      setEditableNew(result.newText);
+      setShowResult(true);
+    } catch (e: any) {
+      console.error('Regeneration failed:', e);
+      setNewText(`Fehler: ${e.message}`);
+      setEditableNew('');
+      setShowResult(true);
+    }
+    setIsGenerating(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-700 px-6 py-3 flex items-center justify-between shrink-0">
+          <div className="text-white">
+            <h3 className="font-bold text-sm flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-yellow-300" />
+              WP{request.wpNumber} — {request.label}
+            </h3>
+            <p className="text-white/60 text-[11px]">Text anpassen basierend auf Evaluator-Feedback</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg"><X className="w-5 h-5 text-white" /></button>
+        </div>
+
+        {/* Input area */}
+        {!showResult && (
+          <div className="p-5 space-y-3 shrink-0 border-b">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block flex items-center gap-1">
+                <MessageSquare className="w-3 h-3" />
+                Was soll geändert werden?
+              </label>
+              <textarea
+                value={instruction}
+                onChange={e => setInstruction(e.target.value)}
+                placeholder={language === 'de'
+                  ? 'z.B. "Surveys on the Target Group hinzufügen" oder "mehr Fokus auf digitale Kompetenzen"'
+                  : 'e.g. "Add surveys on the target group" or "more focus on digital competences"'}
+                className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 min-h-[60px] resize-none"
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMode('enhance')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mode === 'enhance' ? 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-300' : 'bg-gray-100 text-gray-500'}`}
+                >
+                  Erweitern & Verbessern
+                </button>
+                <button
+                  onClick={() => setMode('replace')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mode === 'replace' ? 'bg-red-100 text-red-700 ring-1 ring-red-300' : 'bg-gray-100 text-gray-500'}`}
+                >
+                  Komplett neu schreiben
+                </button>
+              </div>
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating || !instruction.trim()}
+                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isGenerating ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" />Generiere...</>
+                ) : (
+                  <><Sparkles className="w-4 h-4" />Generieren</>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Side-by-side diff preview */}
+        {showResult && (
+          <div className="flex-1 overflow-auto">
+            <div className="grid grid-cols-2 gap-0 h-full">
+              {/* OLD */}
+              <div className="border-r border-gray-200">
+                <div className="bg-red-50 px-4 py-2 border-b border-red-200 sticky top-0">
+                  <span className="text-xs font-bold text-red-700">AKTUELLER TEXT</span>
+                </div>
+                <div className="p-4 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
+                  {request.oldText || <span className="italic text-gray-400">Kein bestehender Text</span>}
+                </div>
+              </div>
+              {/* NEW */}
+              <div>
+                <div className="bg-green-50 px-4 py-2 border-b border-green-200 sticky top-0">
+                  <span className="text-xs font-bold text-green-700">NEUER TEXT</span>
+                  <span className="text-[10px] text-green-500 ml-2">(editierbar)</span>
+                </div>
+                <div className="p-4">
+                  <textarea
+                    value={editableNew}
+                    onChange={e => setEditableNew(e.target.value)}
+                    className="w-full text-sm text-gray-700 whitespace-pre-wrap leading-relaxed min-h-[300px] resize-y border border-green-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer with actions */}
+        {showResult && (
+          <div className="border-t bg-gray-50 px-6 py-3 flex items-center justify-between shrink-0">
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowResult(false); setNewText(''); setEditableNew(''); }}
+                className="px-3 py-2 bg-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-300"
+              >
+                <ArrowRight className="w-3 h-3 inline mr-1 rotate-180" />Nochmal generieren
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-300"
+              >
+                Verwerfen
+              </button>
+              <button
+                onClick={() => {
+                  onAccept(request.answerKey, editableNew);
+                  onClose();
+                }}
+                disabled={!editableNew.trim()}
+                className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg text-sm font-medium hover:from-green-600 hover:to-emerald-700 flex items-center gap-2 disabled:opacity-50"
+              >
+                <Check className="w-4 h-4" />
+                Übernehmen
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // WP CARD
 // ============================================================================
 
-function WPCard({ data, wpIndex, onUpdateWP, expanded, onToggle }: {
+function WPCard({ data, wpIndex, onUpdateWP, onRegenerate, pipelineState, expanded, onToggle }: {
   data: WPDisplayData;
   wpIndex: number;
   onUpdateWP: (idx: number, u: Partial<WorkPackage>) => void;
+  onRegenerate: (req: RegenRequest) => void;
+  pipelineState: PipelineState;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -382,8 +577,21 @@ function WPCard({ data, wpIndex, onUpdateWP, expanded, onToggle }: {
         {/* Objectives */}
         {data.objectives.length > 0 && (
           <div>
-            <div className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold mb-1 flex items-center gap-1">
-              <Target className="w-3 h-3" /> Ziele
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold flex items-center gap-1">
+                <Target className="w-3 h-3" /> Ziele
+              </span>
+              <button
+                onClick={() => onRegenerate({
+                  wpNumber: data.number,
+                  answerKey: `wp_objectives_wp${data.number}`,
+                  label: 'Ziele / Objectives',
+                  oldText: getAns(pipelineState, `wp_objectives_wp${data.number}`),
+                })}
+                className="text-[9px] text-indigo-500 hover:text-indigo-700 flex items-center gap-0.5 print:hidden"
+              >
+                <Sparkles className="w-3 h-3" />
+              </button>
             </div>
             <ul className="space-y-0.5">
               {data.objectives.map((o, i) => (
@@ -404,19 +612,51 @@ function WPCard({ data, wpIndex, onUpdateWP, expanded, onToggle }: {
             <span className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold flex items-center gap-1">
               <Zap className="w-3 h-3" /> Aktivitäten
             </span>
-            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${s.bg} ${s.text}`}>{data.activities.length}</span>
+            <div className="flex items-center gap-1">
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${s.bg} ${s.text}`}>{data.activities.length}</span>
+              <button
+                onClick={() => onRegenerate({
+                  wpNumber: data.number,
+                  answerKey: `wp_act_content_wp${data.number}`,
+                  label: `Aktivitäten`,
+                  oldText: getAns(pipelineState, `wp_act_content_wp${data.number}`),
+                })}
+                className="text-[9px] text-indigo-500 hover:text-indigo-700 flex items-center gap-0.5 print:hidden"
+                title="Aktivitäten mit KI anpassen"
+              >
+                <Sparkles className="w-3 h-3" />
+              </button>
+            </div>
           </div>
           {data.activities.length === 0 ? (
             <p className="text-[10px] text-gray-400 italic text-center py-1">Noch nicht generiert</p>
           ) : (
             <div className="space-y-0.5">
-              {(expanded ? data.activities : data.activities.slice(0, 4)).map(act => (
-                <div key={act.code} className={`flex items-start gap-1.5 ${s.bg} rounded px-2 py-1`}>
+              {(expanded ? data.activities : data.activities.slice(0, 4)).map((act, actIdx) => (
+                <div key={act.code} className={`flex items-start gap-1.5 ${s.bg} rounded px-2 py-1 group/act`}>
                   <span className={`text-[8px] font-bold text-white bg-gradient-to-r ${s.gradient} px-1 py-0.5 rounded shrink-0`}>{act.code}</span>
                   <div className="min-w-0 flex-1">
                     <span className="text-[11px] text-gray-700">{act.title}</span>
                     {act.timing && <span className="text-[9px] text-gray-400 ml-1">({act.timing})</span>}
                   </div>
+                  <button
+                    onClick={() => {
+                      const actNum = actIdx + 1;
+                      const key = `wp_act${actNum}_content_wp${data.number}`;
+                      const fallbackKey = `wp_act_content_wp${data.number}`;
+                      const oldText = getAns(pipelineState, key) || getAns(pipelineState, fallbackKey);
+                      onRegenerate({
+                        wpNumber: data.number,
+                        answerKey: key,
+                        label: `${act.code}: ${act.title}`,
+                        oldText,
+                      });
+                    }}
+                    className="opacity-0 group-hover/act:opacity-100 text-indigo-400 hover:text-indigo-600 print:hidden shrink-0"
+                    title="Diese Aktivität anpassen"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                  </button>
                 </div>
               ))}
               {!expanded && data.activities.length > 4 && (
@@ -653,6 +893,7 @@ export default function WorkPackageOverview({
   const [expandedWPs, setExpandedWPs] = useState<Set<number>>(new Set());
   const [showTimeline, setShowTimeline] = useState(true);
   const [allExpanded, setAllExpanded] = useState(false);
+  const [regenRequest, setRegenRequest] = useState<RegenRequest | null>(null);
 
   const workPackages = pipelineState.workPackages || [];
   const totalBudget = pipelineState.configuration?.totalBudget || 250000;
@@ -746,10 +987,25 @@ export default function WorkPackageOverview({
         <div className={`grid grid-cols-1 ${gridCols} gap-3`}>
           {wpData.map((d, idx) => (
             <WPCard key={d.number} data={d} wpIndex={idx} onUpdateWP={onUpdateWorkPackage}
+              onRegenerate={setRegenRequest} pipelineState={pipelineState}
               expanded={expandedWPs.has(d.number)} onToggle={() => toggleWP(d.number)} />
           ))}
         </div>
       </div>
+
+      {/* REGENERATE MODAL */}
+      {regenRequest && (
+        <RegenerateModal
+          request={regenRequest}
+          pipelineState={pipelineState}
+          language={language}
+          onAccept={(answerKey, newText) => {
+            onUpdateAnswer(answerKey, newText);
+            setRegenRequest(null);
+          }}
+          onClose={() => setRegenRequest(null)}
+        />
+      )}
 
       {/* PRINT VIEW — separate clean layout */}
       <PrintOverview items={wpData} projectTitle={projectTitle} acronym={acronym} totalBudget={totalBudget} duration={duration} />
